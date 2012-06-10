@@ -3,4 +3,86 @@ MATLAByrinth
 
 A distributed Master/Worker framework for Matlab
 
+INSTALLATION
+============
 For installation, see the INSTALL.txt file
+
+
+USING MATLAByrinth
+==================
+
+After installing, you can use the following command to count the number
+of available generic compute nodes on Aciss:
+
+  launch_interactive_qsub count
+
+Then you can launch MATLAByrinth with some number of MATLAB instances less than
+the number printed above.  For example, if 16 or more compute nodes are 
+available, then you can issue the following command to launch an interactive
+session in the resource queue with 16 processes:
+
+  launch_interactive_qsub 16
+
+Then you must launch MATLAByrinth itself with 1 master process and 15 worker 
+processes.  This is done by running the following command:
+
+  launch_interactive_Rinth 16
+
+This will launch a single interactive Matlab environment and 15 other Matlabs 
+running in the background on 15 other compute nodes.
+
+To send a job to the workers, save a .mat file with objects to be split between
+the workers, and another .mat file with objects to shared among the workers.
+
+In the case of Stingray, this procedure is done in the following files:
+
+  <Stingray_root_dir>/branches/MATLAByrinth/ForwardTL_initStation.m
+  <Stingray_root_dir>/branches/MATLAByrinth/ForwardTL_initStation_sub.m
+
+
+
+TESTING MATLAByrinth
+====================
+
+Besides running Stingray with the .m files above, you should be able to test 
+the installation by launching MATLAByrinth as described above.
+If the launch worked, you should see 15 lines confirming the 
+connection of workers to the master process:
+
+  Worker connected:  ('192.168.1.22', 33466)
+  Worker connected:  ('192.168.1.22', 33467)
+  ...
+
+If so, run the following Matlab commands to the interative session:
+
+  m = getenv('MATLABYRINTH');
+  load([m, '/src/MATLAByrinth/my_split1.mat'])
+  load([m, '/src/MATLAByrinth/my_shared.mat'])
+  [x y] = send_jobs_to_workers('Rinth_testfunc', 'aStation', 'tlMisfit_sub', 'srModel')
+
+When the quick computation is finished, the x.A0 object should contain:
+
+    x =
+    
+        34    34
+        34    34
+
+and the y object should contain:
+
+    y = 
+    
+            bvec: 31
+             res: 31
+           niter: 31
+             ptr: 31
+           ttime: 31
+           inode: 31
+        ray_minz: 31
+          icntTT: 31
+           zssqr: 31
+           wssqr: 31
+           sumsd: 31
+           nssqr: 31
+          nelsum: 31
+          nramat: 31
+

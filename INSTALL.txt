@@ -1,7 +1,0 @@
-Need to add certain files to the MATLAB path:
-
-  addpath <trunk>/src/matlab
-
-Need to add the interactive job launcher to the user path:
-
-  export $PATH:<trunk>/bin/
