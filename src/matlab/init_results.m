@@ -1,0 +1,16 @@
+function [A0_sub tlMisfit_sub] = init_results(num_jobs)
+  A0_sub(num_jobs).A0 = [];
+  tlMisfit_sub(num_jobs).bvec   = [];   % was nans, but throwing out rows caused probs
+  tlMisfit_sub(num_jobs).res    = [];   % was nans...
+  tlMisfit_sub(num_jobs).ptr    = [];
+  tlMisfit_sub(num_jobs).ttime  = [];                              
+  tlMisfit_sub(num_jobs).inode  = [];
+  tlMisfit_sub(num_jobs).ray_minz   = [];
+  tlMisfit_sub(num_jobs).niter  = 0;
+  tlMisfit_sub(num_jobs).icntTT = 0;
+  tlMisfit_sub(num_jobs).zssqr  = 0;
+  tlMisfit_sub(num_jobs).wssqr  = 0;                                         
+  tlMisfit_sub(num_jobs).sumsd  = 0;
+  tlMisfit_sub(num_jobs).nssqr  = 0;                  
+  tlMisfit_sub(num_jobs).nelsum = 0;
+  tlMisfit_sub(num_jobs).nramat = 0;

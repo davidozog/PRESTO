@@ -1,0 +1,6 @@
+#!/bin/bash
+
+for d in `cat /etc/hosts | grep "^192.168.1\." | cut -f2 -d ' '`;
+ do mkdir ~/.matlab/local_scheduler_data/R2011b/$d ;
+done
+

@@ -1,0 +1,16 @@
+#!/usr/bin/env python
+import subprocess
+import sys
+
+mFunction = sys.argv[0]
+print   sys.argv[0]
+mFunction = sys.argv[1]
+print   sys.argv[1]
+mSplitData = sys.argv[2]
+print   sys.argv[2]
+mSharedData = sys.argv[3]
+print   sys.argv[3]
+
+cmd = 'mpirun -np 1 python /home/dave/School/Masters-Thesis/src/matlab-python-popen/matlab-subprocess-stdout.py ' + mFunction + ' ' + mSplitData + ' ' + mSharedData
+
+subprocess.call(cmd, shell=True)
