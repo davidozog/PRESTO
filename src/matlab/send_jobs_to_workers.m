@@ -38,8 +38,8 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
     for i=1:nVarargs
       save_str = [save_str ', ''' varargin{i}, ''''];
     end
-    mpath = 'masterdata.mat';
-    epath = 'empty.mat';
+    mpath = '.masterdata.mat';
+    epath = '.empty.mat';
     evalin('caller', horzcat('save(''', mpath, '''', save_str, ')')) ;
     nul___ = '';
     save(epath, 'nul___');
@@ -83,7 +83,7 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
   end
 
   % I have all the results now, so put them into the output objects 
-  init_results(num_jobs);
+  %init_results(num_jobs);
   for i=1:length(results)
     result_file = char(results(i));
     load(result_file);
