@@ -31,7 +31,7 @@ This will launch a single interactive Matlab environment and 15 other Matlabs
 running in the background on 15 other compute nodes.
 
 To send a job to the workers, save a .mat file with objects to be split between
-the workers, and another .mat file with objects to shared among the workers.
+the workers, and another .mat file with objects to be shared among the workers.
 
 In the case of Stingray, this procedure is done in the following files:
 
