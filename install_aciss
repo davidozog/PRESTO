@@ -27,7 +27,7 @@ library_dirs         = %(mpi_dir)s/lib
 runtime_library_dirs = %(library_dirs)s' >> mpi.cfg
 
 python setup.py build --mpi=aciss_openmpi
-#python setup.py install --user
+python setup.py install --user
 
 cd ../../
 
