@@ -2,7 +2,7 @@ INSTALLATION
 ============
 
 1) If you are on the Aciss cluster, run the installation script:
-      ./insall_aciss
+      ./install_aciss
 
 2) Refer to the MATLAByrinth README file to see how to test the installation.
 
