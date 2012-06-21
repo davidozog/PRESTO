@@ -1,34 +1,8 @@
 INSTALLATION
 ============
 
-1) Download the MATLAByrinth repository with the following commands:
+1) If you are on the Aciss cluster, run the installation script:
+      ./insall_aciss
 
-    mkdir ~/MATLAByrinth-install
-    cd ~/MATLAByrinth-install
-    git clone https://github.com/davidozog/MATLAByrinth.git
-
-2) Install mpi4py by issuing the following commands:
-
-    cd ~/MATLAByrinth-install
-    wget https://mpi4py.googlecode.com/files/mpi4py-1.3.tar.gz
-    tar xzvf mpi4py-1.3.tar.gz
-    cd mpi4py-1.3
-    module purge
-    module load python/2.7.2 numpy/1.6.1 mpi-tor/openmpi-1.4.5_gcc-4.4.6
-    python setup.py build
-    python setup.py install --user
-
-3) Add the bin dir to your path.  For example in your ~/.bashrc file:
-    export PATH=$PATH:~/MATLAByrinth-install/MATLABYrinth/bin
-
-   Also set the MATLABYRINT environment variable:
-    export MATLABYRINTH='~/MATLAByrinth-install/MATLAByrinth'
-
-4) If it does not exist, create the following directory and file:
-    ~/Documents/MATLAB/startup.m
-
-  and append this line to the startup.m file:
-    addpath ~/MATLAByrinth-install/MATLABYrinth/src/matlab
-
-5) Refer to the MATLAByrinth REAME file to see how to test the installation.
+2) Refer to the MATLAByrinth README file to see how to test the installation.
 

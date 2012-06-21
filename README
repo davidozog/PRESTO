@@ -1,16 +1,15 @@
 MATLAByrinth
 ============
-
 A distributed Master/Worker framework for Matlab
+
 
 INSTALLATION
 ============
-For installation, see the INSTALL.txt file
+Please read the INSTALL file.
 
 
 USING MATLAByrinth
 ==================
-
 After installing, you can use the following command to count the number
 of available generic compute nodes on Aciss:
 
