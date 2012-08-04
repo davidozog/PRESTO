@@ -3,35 +3,50 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
   nVarargs = length(varargin);
 
   % Mode 1 : user supplied his own 'split' and 'shared' .mat files
+  %          i.e.  send_jobs_to_workers('myfunc', 'NFS', 'my_split.mat', 'my_shared.mat')
   % Mode 2 : launch a single job with the given objects ...
+  %          i.e.  send_jobs_to_workers('myfunc', 'object1', 'object2', ...)
+  % TODO: Make Mode 2 asynchronous...
+  % Mode 3 : pass objects to a mex file
+  %          i.e   send_jobs_to_workers('myfunc', 'NETWORK', {split: 'object1', 'object2', ...} 
+  %                                               {shared: 'object3', 'object4', ...})
   firstvar = varargin{1};
   mode=1;
   try
-    if firstvar(end-3:end) == '.mat'
+    if strcmp(firstvar, 'NFS')
       mode = 1;
-    else mode = 2;
+    elseif strcmp(firstvar, 'NETWORK')
+      mode = 3;
+    else 
+      mode = 2;
     end
   catch
     mode=2;
   end
 
+  % MODE 1:
   if mode == 1
-    load(varargin{1})
+    load(varargin{2})
     W = whos;
     %num_jobs = length(W(1).size);
     num_jobs = W(1).size(1);
     aStation_ = aStation;
     tlMisfit_sub_ = tlMisfit_sub;
     mesg{num_jobs} = '';
+    % Split the split_file into individual jobs:
     for j = 1:num_jobs
       jobid = int2str(j);
       aStation = aStation_(j);
       tlMisfit_sub = tlMisfit_sub_(j);
       save(horzcat('.split_', jobid, '.mat'), 'aStation', 'tlMisfit_sub');
-      mesg{j} = horzcat(remote_method, ', ', jobid, ', ', './.split_', jobid, '.mat, ', varargin{2});
+      mesg{j} = horzcat(remote_method, ', ', varargin{1}, ', ', jobid, ', ', './.split_', jobid, '.mat, ', varargin{3});
     end
+  end
 
-  elseif mode==2
+  % MODE 2:
+  % TODO: I don't think this will work anymore 
+  % now that NETWORK/NFS is implemented...
+  if mode==2
     num_jobs = 1;
     mesg{num_jobs} = '';
     save_str = '';
@@ -45,6 +60,45 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
     save(epath, 'nul___');
     mesg{1} = horzcat(remote_method, ', 1, ', epath, ', ', mpath);
   end
+
+  % MODE 3:
+  if mode==3
+  fprintf(1, 'got it');
+    %NSplit = find(strcmp(varargin{2}, 'shared'));
+    %stingrayObj(varargin{2}(2:NSplit-1), varargin{2}(NSplit+1:end));
+
+    % serialize a cell containing the split objects
+    splitVarStr = '';
+    for i=1:length(varargin{2})
+      splitVarStr = [splitVarStr, varargin{2}{i}, ', '];
+    end
+  fprintf(1, ['splitVarStr is ', splitVarStr]);
+
+    % Get size of first variable and assume it's the number of jobs
+    num_jobs = evalin('caller', ['length(', varargin{2}{1}, ')']);
+
+    % serialize a cell containing the shared objects
+    sharedVarStr = '';
+    for i=1:length(varargin{3})
+      sharedVarStr = [sharedVarStr, varargin{3}{i}, ', '];
+    end
+
+    evalin('caller', ['m = serialize({', splitVarStr, sharedVarStr '})']);
+    shmem_size = evalin('caller', 'length(m)');
+
+    mesg{num_jobs} = '';
+    for j = 1:num_jobs
+      jobid = int2str(j);
+      % TODO: coordinate transfer with Python master through Sys V shmem
+      %       Master will have to parse message and look for 'NETWORK' at around line 105
+      %       and set up the memory segment then the master will send the message
+      %       as a byte array to the worker somehow
+      mesg{j} = horzcat(remote_method, ', ', varargin{1}, ', ', jobid, ', ', './.split_', jobid, '.mat, ', int2str(shmem_size));
+    end
+    mesg{3}(1)
+
+    
+  end % mode 3
 
   import java.io.*;
   import java.net.*;
@@ -62,7 +116,11 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
     out.println(mesg{i});
   end
 
-  out.println('done');
+  fprintf('before shmem');
+
+  evalin('caller', ['mat2shmem(m)';]);
+
+  fprintf('after master shmem');
 
   % Receive all finished jobs from workers:
   results = cell(1,num_jobs);
@@ -81,6 +139,8 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
       results(jobs_accounted_for) = {fromMPI};
     end
   end
+
+  out.println('done');
 
   % I have all the results now, so put them into the output objects 
   %init_results(num_jobs);

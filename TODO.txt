@@ -1,3 +1,16 @@
+* Send through shared memory and network
+  load my_split.mat
+  load my_shared.mat
+  dbstop in send_jobs_to_workers at 64
+  send_jobs_to_workers('Rinth_testfunc', 'NETWORK', {'split', {aStation, tlMisfit_sub}, 'shared', {srModel}})
+
+  Actually, I want this function to look like this:
+
+  send_jobs_to_workers('Rinth_testfunc', 'NETWORK', {'aStation', 'tlMisfit_sub'}, {'srModel'})
+
+  then I can probably get the variables from the caller workspace... right?
+  
+
 * varargout for remote function
 
 * Create an interface for task-based parallelism.

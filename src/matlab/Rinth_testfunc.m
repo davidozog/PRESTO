@@ -1,8 +1,8 @@
-%function [A0_sub tlMisfit] = Rinth_testfunc(aStation, srModel)
-function [A0_sub tlMisfit_sub] = Rinth_testfunc(split_filepath, shared_filepath)
-  load(split_filepath)
-  load(shared_filepath)
-  fprintf(2, horzcat('hi from matlab - shared_filepath is ', shared_filepath, ' \n'))
+function [A0_sub tlMisfit_sub] = Rinth_testfunc(aStation, srModel)
+%function [A0_sub tlMisfit_sub] = Rinth_testfunc(split_filepath, shared_filepath)
+%  load(split_filepath)
+%  load(shared_filepath)
+% fprintf(2, horzcat('hi from matlab - shared_filepath is ', shared_filepath, ' \n'))
   
   station = str2num(char(aStation));
   A0_sub.A0 = [station station; station station] + srModel;

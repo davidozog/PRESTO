@@ -38,19 +38,38 @@ function mworker(my_hostname, rank)
         set(sch, 'DataLocation', hostpool);
 
         % Parse the function name and the input filenames:
+        fprintf(2, ['fromClient is ',  fromClient])
         [token, remain] = strtok(fromClient, ',');
         fh = str2func(strtrim(token));
+        [token, remain] = strtok(remain, ',');
+        proto = strtrim(token);
         [token, remain] = strtok(remain, ',');
         jobid = strtrim(token);
         sf = strfind(remain, ',')
         arg_files = strtrim(remain(sf+1:end))
         [token, remain] = strtok(arg_files, ',');
-        split_file = strtrim(token);
+        split_file = strtrim(token)
+        fprintf(2, ['split_file is ',  split_file])
         sf = strfind(remain, ',')
         shared_file = strtrim(remain(sf+1:end))
+        [token, remain] = strtok(remain, ',');
+        shmem_size = strtrim(token)
 
-        % Call the function:
-        [ret1 ret2]  = fh(split_file, shared_file);
+        % If protocol is shmem/network, get the data:
+        if strcmp(proto, 'NETWORK')
+          fprintf(2, ['\n > > > > > > > > > > CALLING shmem2mat.c with shmem_size: ', shmem_size , '\n'])
+          %evalin('caller', ['stingray_data = shmem2mat(',shmem_size,')']);
+          stingray_data = shmem2mat(str2num(shmem_size));
+          SD = deserialize(stingray_data)
+          SD{1}(rank)
+          SD{3}
+
+          % Call the function:
+          [ret1 ret2]  = fh(SD{1}(rank), SD{3});
+
+        else 
+          [ret1 ret2]  = fh(split_file, shared_file);
+        end
 
         % write results to file and pass path to master
         results_file = ['./.results_', jobid, '.mat'];
