@@ -25,7 +25,7 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
   end
 
   % MODE 1:
-  if mode == 1
+  if mode==1
     load(varargin{2})
     W = whos;
     %num_jobs = length(W(1).size);
@@ -83,17 +83,17 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
       sharedVarStr = [sharedVarStr, varargin{3}{i}, ', '];
     end
 
-    evalin('caller', ['m = serialize({', splitVarStr, sharedVarStr '})']);
-    shmem_size = evalin('caller', 'length(m)');
+    shmem_size = zeros(num_jobs, 1);
+    % TODO: make m1, m2, ... all separate splits of data
+    for i=1:num_jobs
+      evalin('caller', ['m',num2str(i),'=serialize({',splitVarStr,sharedVarStr,'});']);
+      shmem_size(i) = evalin('caller', ['length(m',num2str(i),')']);
+    end
 
     mesg{num_jobs} = '';
     for j = 1:num_jobs
       jobid = int2str(j);
-      % TODO: coordinate transfer with Python master through Sys V shmem
-      %       Master will have to parse message and look for 'NETWORK' at around line 105
-      %       and set up the memory segment then the master will send the message
-      %       as a byte array to the worker somehow
-      mesg{j} = horzcat(remote_method, ', ', varargin{1}, ', ', jobid, ', ', './.split_', jobid, '.mat, ', int2str(shmem_size));
+      mesg{j} = horzcat(remote_method, ', ', varargin{1}, ', ', jobid, ', ', './.split_', jobid, '.mat, ', int2str(shmem_size(j)));
     end
     mesg{3}(1)
 
@@ -116,11 +116,15 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
     out.println(mesg{i});
   end
 
-  fprintf('before shmem');
+  out.println('done');
 
-  evalin('caller', ['mat2shmem(m)';]);
-
-  fprintf('after master shmem');
+  % TODO bring back the [m1, m2, m3] version...
+  if mode==3
+    fprintf('before shmem');
+    evalin('caller', ['mat2shmem( [m1, m2, m3])';]);
+    %evalin('caller', ['mat2shmem(m1)';]);
+    fprintf('after master shmem');
+  end
 
   % Receive all finished jobs from workers:
   results = cell(1,num_jobs);
@@ -140,7 +144,6 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
     end
   end
 
-  out.println('done');
 
   % I have all the results now, so put them into the output objects 
   %init_results(num_jobs);

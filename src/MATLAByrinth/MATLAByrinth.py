@@ -39,6 +39,19 @@ def launch_matlab(queue, worker_dict):
   # send kill signal to all workers
   q.put('kill')
 
+def master_shmem_initiailization():
+  try:
+    semaphore = posix_ipc.Semaphore('MATSEM')
+    semaphore.unlink()
+  except:
+    pass 
+  try: 
+    memory = posix_ipc.SharedMemory('MAT2SHM')
+    memory.unlink()
+  except:
+    pass
+
+#def worker_shmem_initiailization():
 
 # Initialize mpi4py:
 mpiComm = MPI.COMM_WORLD
@@ -68,6 +81,8 @@ if (rank==0):
   t = threading.Thread(target=launch_matlab, args=(q, worker_dict))
   t.start()
 
+  master_shmem_initiailization()
+
   sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
   sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
   #sock.settimeout(10)
@@ -95,6 +110,7 @@ if (rank==0):
         mesg_q = Queue()
         destination = 0
         running_jobs = []   # rank of the workers with running jobs
+        #import pdb; pdb.set_trace()
         while mesg!='kill':
           if(DEBUG):print '     master waiting for work...'
           if mesg_q.qsize() > 0:
@@ -111,9 +127,9 @@ if (rank==0):
             mesg = mesg_q.get() + '\n'
           if (len(mesg) > 0):
             if(DEBUG):print '     master message is ' + mesg 
-            protocol = mesg.split(',')[1].strip()
             if mesg == 'done\n':
               break
+            protocol = mesg.split(',')[1].strip()
             if protocol == 'NETWORK':
               while True:
                 try:
@@ -122,15 +138,15 @@ if (rank==0):
                 except:
                   time.sleep(1)
                   continue
+              semaphore.acquire()
               memory = posix_ipc.SharedMemory('MAT2SHM')
               mapfile = mmap.mmap(memory.fd, memory.size)
               os.close(memory.fd)
-              semaphore.acquire()
               mesg_len = int(mesg.split()[-1])
               mesg_dat = shmemUtils.read_from_memory(mapfile, mesg_len)
               print mesg_dat
               semaphore.release()
-              mesg = mesg + mesg_dat
+              mesg = mesg.strip() + ':' + mesg_dat + '\n'
             # Determine the rank of the next worker:
             if (destination != size-1):
               destination = (destination + 1) % size
@@ -200,10 +216,9 @@ else:
     if (worker_status.tag == DO_WORK_TAG):
       if(DEBUG):print 'P'+srank+':(sending): do_work ( ' + mesg + ' ) ' 
       
-      # TODO: send byte array to matlab via shmem
+      # Send byte array to Matlab worker via shmem
       if protocol == 'NETWORK':
-        print 'Yet again, you made it'
-        mesg_data = mesg.split('\n')[-1].strip()
+        mesg_data = mesg.split(':')[-1].strip()
 #        saveobject(mesg_data, r'/home11/ozog/School/MATLAByrinth/mesg_pickle')
         print "worker mesg_data is " + mesg_data
 
@@ -240,9 +255,6 @@ else:
       # Wait for results (filename):
       data = conn.recv(1024)
       if(DEBUG):print 'P'+srank+':(received): ' + data
-      semaphore.acquire()
-      memory.unlink()
-      mapfile.close()
 
       # Send results (filename) back to master:
       mpiComm.send(data, dest=0, tag=RESULTS_TAG)
@@ -253,6 +265,10 @@ else:
         if(DEBUG):print 'KILL MESSAGE came from ' + str(worker_status.source)
         kill = mpiComm.recv(source=worker_status.source, tag=worker_status.tag)
     elif (worker_status.tag == KILL_TAG):
+      if protocol == 'NETWORK':
+        semaphore.acquire()
+        memory.unlink()
+        mapfile.close()
       break
 
 # MPI : once rank 0 Matlab is dead, kill the workers
