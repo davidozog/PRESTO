@@ -9,6 +9,7 @@ import time
 from Queue import Queue, Empty
 import struct
 import posix_ipc
+import sysv_ipc
 import mmap
 import shmemUtils
 
@@ -23,6 +24,8 @@ RESULTS_TAG = 4
 
 WORKER_PORT = 11110
 MASTER_PORT = 11112
+
+MQKEY = 48963
 
 import pickle
 def saveobject(obj, filename):
@@ -50,7 +53,19 @@ def master_shmem_initiailization():
     memory.unlink()
   except:
     pass
-
+  try:
+    result_sem = posix_ipc.Semaphore('RESULT_SEM')
+    result_sem.unlink()
+  except:
+    pass 
+  try: 
+    mq = sysv_ipc.MessageQueue(MQKEY)
+    mq.remove()
+    #result_mem= posix_ipc.SharedMemory('RESULT_SHM')
+    #result_mem.unlink()
+  except:
+    pass
+ 
 #def worker_shmem_initiailization():
 
 # Initialize mpi4py:
@@ -82,6 +97,9 @@ if (rank==0):
   t.start()
 
   master_shmem_initiailization()
+  #result_mem = posix_ipc.SharedMemory('RESULT_SHM', posix_ipc.O_CREX, size=4096)
+  #result_sem = posix_ipc.Semaphore('RESULT_SEM', posix_ipc.O_CREX)
+  mq = sysv_ipc.MessageQueue(MQKEY, sysv_ipc.IPC_CREX)
 
   sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
   sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -119,6 +137,7 @@ if (rank==0):
           else:
             mesg = cnn.recv(1024)
             fromq = False
+          # why is 'filter' here?  TODO:
           mesg_split = filter(None, mesg.split('\n'))
           for m in mesg_split:
             if len(m) > 0 and (m) != mesg:
@@ -138,15 +157,16 @@ if (rank==0):
                 except:
                   time.sleep(1)
                   continue
+              mesg_len = int(mesg.split()[-1])
               semaphore.acquire()
               memory = posix_ipc.SharedMemory('MAT2SHM')
               mapfile = mmap.mmap(memory.fd, memory.size)
               os.close(memory.fd)
-              mesg_len = int(mesg.split()[-1])
               mesg_dat = shmemUtils.read_from_memory(mapfile, mesg_len)
-              print mesg_dat
+              #print mesg_dat
               semaphore.release()
               mesg = mesg.strip() + ':' + mesg_dat + '\n'
+
             # Determine the rank of the next worker:
             if (destination != size-1):
               destination = (destination + 1) % size
@@ -177,7 +197,27 @@ if (rank==0):
           if(DEBUG):print 'GOT RESULT:' + data
           running_jobs.remove(master_status.source)
           master_status = MPI.Status()
-          cnn.sendall(data)
+
+          # TODO - send data to shmem - using a new shmem segment with a message queue
+          if protocol == 'NETWORK':
+            result_mesg = ':'.join(data.split(':')[:-1]) + '\n'
+            cnn.sendall(result_mesg)
+
+            mesg_data = data.split(':')[-1]
+            mesg_jobid = int(data.split(':')[-2])
+
+            mq.send(mesg_data, type=mesg_jobid)
+      
+            #mapfile = mmap.mmap(result_mem.fd, result_mem.size)
+            #os.close(result_mem.fd)
+            #shmemUtils.write_to_memory(mapfile, mesg_data)
+            #result_sem.release()
+
+
+          else:
+            cnn.sendall(data)
+ 
+
 
         if(DEBUG):print 'All workers have sent back results.'
 
@@ -255,6 +295,22 @@ else:
       # Wait for results (filename):
       data = conn.recv(1024)
       if(DEBUG):print 'P'+srank+':(received): ' + data
+
+      if protocol == 'NETWORK':
+        while True:
+          try:
+            semaphore = posix_ipc.Semaphore('MATSEM')
+            break
+          except:
+            time.sleep(1)
+            continue
+        mesg_len = int(data.split(':')[-1])
+        semaphore.acquire()
+        memory = posix_ipc.SharedMemory('MAT2SHM')
+        mapfile = mmap.mmap(memory.fd, memory.size)
+        os.close(memory.fd)
+        shm_data = shmemUtils.read_from_memory(mapfile, mesg_len)
+        data = data.strip() + ':' + srank + ':' + shm_data
 
       # Send results (filename) back to master:
       mpiComm.send(data, dest=0, tag=RESULTS_TAG)

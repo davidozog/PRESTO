@@ -118,10 +118,10 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
 
   out.println('done');
 
-  % TODO bring back the [m1, m2, m3] version...
+  % TODO Create string of 'm1, m2, ...' arrays and pass that instead
   if mode==3
     fprintf('before shmem');
-    evalin('caller', ['mat2shmem( [m1, m2, m3])';]);
+    evalin('caller', ['mat2shmem( [m1, m2, m3] )';]);
     %evalin('caller', ['mat2shmem(m1)';]);
     fprintf('after master shmem');
   end
@@ -138,24 +138,56 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
     end
     fromMPI = char(fromMPI);
     if length(fromMPI>0)
-      %fprintf(1, horzcat('Master:(received): ', fromMPI, '\n'));
+      fprintf(1, horzcat('Master:(received): ', fromMPI, '\n'));
       jobs_accounted_for = jobs_accounted_for + 1;
       results(jobs_accounted_for) = {fromMPI};
     end
   end
 
-
   % I have all the results now, so put them into the output objects 
-  %init_results(num_jobs);
-  for i=1:length(results)
-    result_file = char(results(i));
-    load(result_file);
-    [token, remain] = strtok(result_file, '_');
-    idx = remain(2:strfind(remain, '.')-1);
-    idx = str2num(idx);
-    A(idx) = struct(ret1);
-    B(idx) = struct(ret2);
-    system(['rm ', result_file]);
+  %TODO: split this loop and call shmResult() with a list of (jobid, datasize) pairs
+  %      which returns when all data is read.
+  if mode==3
+    %res_arg = zeros(1,length(results));
+    for i=1:length(results)
+      results(i)
+      [token, remain] = strtok(results(i), ':');
+      [token, remain] = strtok(remain, ':');
+      shmem_size = strtrim(token)
+      [token, remain] = strtok(remain, ':');
+      %TODO: This should be jobid, not rank.  Trace it down and make sure that's the case
+      result_rank = strtrim(token); 
+      res_arg{str2num(char(result_rank))} = [str2num(char(shmem_size)), str2num(char(result_rank))];
+      %evalin('caller', ['r',num2str(i),'=[',char(shmem_size), ', ', char(result_rank),'];']);
+    end
+    
+      
+    fprintf(1, ['Master GETTING RESULTS ...']);
+    % TODO: These have to be sorted first!
+    for i=1:length(results)
+      R{i} = shmResult2mat(res_arg{i})
+    end
+
+    for i=1:length(results)
+      D = deserialize(R{i});
+      A(i) = D{1};
+      B(i) = D{2};
+    end
+
+    
+
+  else 
+    for i=1:length(results)
+      result_file = char(results(i));
+      load(result_file);
+      [token, remain] = strtok(result_file, '_');
+      idx = remain(2:strfind(remain, '.')-1);
+      idx = str2num(idx);
+      A(idx) = struct(ret1);
+      B(idx) = struct(ret2);
+      system(['rm ', result_file]);
+    end
+
   end
 
   sock.close();

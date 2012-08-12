@@ -14,6 +14,10 @@ cd mpi4py-1.3
 module purge
 module load python/2.7.2 numpy/1.6.1 mpi-tor/openmpi-1.4.5_gcc-4.4.6 matlab/r2011b
 
+
+#TODO: add posix_ipc and sysv_ipc python modules
+
+
 echo -e '
 # ACISS OPENMPI
 # ----------------

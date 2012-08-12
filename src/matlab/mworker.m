@@ -65,16 +65,24 @@ function mworker(my_hostname, rank)
           SD{3}
 
           % Call the function:
-          [ret1 ret2]  = fh(SD{1}(rank), SD{3});
+          [ret1 ret2]  = fh(SD{1}(rank), SD{3})
 
+          % Write results to shmem and pass to python worker process 
+          ret = serialize({ret1, ret2})
+          out.println(['shmem_data:', num2str(length(ret))]);
+          mat2shmem(ret);
+
+
+        % NFS protocol:
         else 
           [ret1 ret2]  = fh(split_file, shared_file);
-        end
 
-        % write results to file and pass path to master
-        results_file = ['./.results_', jobid, '.mat'];
-        save(results_file, 'ret1', 'ret2');
-        out.println(results_file);
-        system(['rm ', split_file]);
+          % write results to file and pass path to master
+          results_file = ['./.results_', jobid, '.mat'];
+          save(results_file, 'ret1', 'ret2');
+          out.println(results_file);
+          system(['rm ', split_file]);
+
+        end
 
     end
