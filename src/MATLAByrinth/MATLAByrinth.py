@@ -27,11 +27,6 @@ MASTER_PORT = 11112
 
 MQKEY = 48963
 
-import pickle
-def saveobject(obj, filename):
-  with open(filename, 'wb') as output:
-    pickle.dump(obj, output, pickle.HIGHEST_PROTOCOL)
-
 def launch_matlab(queue, worker_dict):
   # Without GUI:
   p = subprocess.Popen(MATLAB_BIN + ' -nodesktop -nosplash -r \"'+ worker_dict + '\"', shell=True)
@@ -61,8 +56,6 @@ def master_shmem_initiailization():
   try: 
     mq = sysv_ipc.MessageQueue(MQKEY)
     mq.remove()
-    #result_mem= posix_ipc.SharedMemory('RESULT_SHM')
-    #result_mem.unlink()
   except:
     pass
  
@@ -97,8 +90,6 @@ if (rank==0):
   t.start()
 
   master_shmem_initiailization()
-  #result_mem = posix_ipc.SharedMemory('RESULT_SHM', posix_ipc.O_CREX, size=4096)
-  #result_sem = posix_ipc.Semaphore('RESULT_SEM', posix_ipc.O_CREX)
   mq = sysv_ipc.MessageQueue(MQKEY, sysv_ipc.IPC_CREX)
 
   sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -208,16 +199,8 @@ if (rank==0):
 
             mq.send(mesg_data, type=mesg_jobid)
       
-            #mapfile = mmap.mmap(result_mem.fd, result_mem.size)
-            #os.close(result_mem.fd)
-            #shmemUtils.write_to_memory(mapfile, mesg_data)
-            #result_sem.release()
-
-
           else:
             cnn.sendall(data)
- 
-
 
         if(DEBUG):print 'All workers have sent back results.'
 
@@ -228,6 +211,7 @@ if (rank==0):
       if line == 'kill':
         print 'kill signal'
         kill = 1
+        mq.remove()
         break
 
 # WORKER CONTROL:
@@ -259,7 +243,6 @@ else:
       # Send byte array to Matlab worker via shmem
       if protocol == 'NETWORK':
         mesg_data = mesg.split(':')[-1].strip()
-#        saveobject(mesg_data, r'/home11/ozog/School/MATLAByrinth/mesg_pickle')
         print "worker mesg_data is " + mesg_data
 
         # TODO: Fix this - why can't I open an already existing shmem / semaphore?
@@ -287,7 +270,6 @@ else:
         #memory.unlink()
         #mapfile.close()
         
-
       else:
         # Send work message (func_name, 'split_file.mat', 'shared_file.mat')
         conn.sendall(mesg)
@@ -310,6 +292,7 @@ else:
         mapfile = mmap.mmap(memory.fd, memory.size)
         os.close(memory.fd)
         shm_data = shmemUtils.read_from_memory(mapfile, mesg_len)
+        semaphore.release()
         data = data.strip() + ':' + srank + ':' + shm_data
 
       # Send results (filename) back to master:

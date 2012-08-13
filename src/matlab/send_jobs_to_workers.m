@@ -63,7 +63,6 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
 
   % MODE 3:
   if mode==3
-  fprintf(1, 'got it');
     %NSplit = find(strcmp(varargin{2}, 'shared'));
     %stingrayObj(varargin{2}(2:NSplit-1), varargin{2}(NSplit+1:end));
 
@@ -173,8 +172,6 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
       A(i) = D{1};
       B(i) = D{2};
     end
-
-    
 
   else 
     for i=1:length(results)
