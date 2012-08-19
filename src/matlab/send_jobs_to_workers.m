@@ -120,7 +120,11 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
   % TODO Create string of 'm1, m2, ...' arrays and pass that instead
   if mode==3
     fprintf('before shmem');
-    evalin('caller', ['mat2shmem( [m1, m2, m3] )';]);
+    %evalin('caller', ['mat2shmemQ( [m1, m2, m3] )';]);
+    for i=1:num_jobs
+      evalin('caller', ['mat2shmemQ( m', num2str(i), ', ', ...
+                num2str(shmem_size(i)), ', ', num2str(i), ')']);
+    end
     %evalin('caller', ['mat2shmem(m1)';]);
     fprintf('after master shmem');
   end
@@ -149,10 +153,9 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
   if mode==3
     %res_arg = zeros(1,length(results));
     for i=1:length(results)
-      results(i)
       [token, remain] = strtok(results(i), ':');
       [token, remain] = strtok(remain, ':');
-      shmem_size = strtrim(token)
+      shmem_size = strtrim(token);
       [token, remain] = strtok(remain, ':');
       %TODO: This should be jobid, not rank.  Trace it down and make sure that's the case
       result_rank = strtrim(token); 

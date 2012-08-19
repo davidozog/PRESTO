@@ -25,7 +25,8 @@ RESULTS_TAG = 4
 WORKER_PORT = 11110
 MASTER_PORT = 11112
 
-MQKEY = 48963
+JQKEY = 37408
+RQKEY = 48963
 
 def launch_matlab(queue, worker_dict):
   # Without GUI:
@@ -38,24 +39,25 @@ def launch_matlab(queue, worker_dict):
   q.put('kill')
 
 def master_shmem_initiailization():
-  try:
-    semaphore = posix_ipc.Semaphore('MATSEM')
-    semaphore.unlink()
-  except:
-    pass 
+  #try:
+  #  semaphore = posix_ipc.Semaphore('MATSEM')
+  #  semaphore.unlink()
+  #except:
+  #  pass 
+  #try: 
+  #  memory = posix_ipc.SharedMemory('MAT2SHM')
+  #  memory.unlink()
+  #except:
+  #  pass
   try: 
-    memory = posix_ipc.SharedMemory('MAT2SHM')
-    memory.unlink()
+    jq = sysv_ipc.MessageQueue(JQKEY)
+    jq.remove()
   except:
     pass
-  try:
-    result_sem = posix_ipc.Semaphore('RESULT_SEM')
-    result_sem.unlink()
-  except:
-    pass 
   try: 
-    mq = sysv_ipc.MessageQueue(MQKEY)
-    mq.remove()
+    # Results Queue (rq)
+    rq = sysv_ipc.MessageQueue(RQKEY)
+    rq.remove()
   except:
     pass
  
@@ -90,7 +92,8 @@ if (rank==0):
   t.start()
 
   master_shmem_initiailization()
-  mq = sysv_ipc.MessageQueue(MQKEY, sysv_ipc.IPC_CREX)
+  rq = sysv_ipc.MessageQueue(RQKEY, sysv_ipc.IPC_CREX)
+  jq = sysv_ipc.MessageQueue(JQKEY, sysv_ipc.IPC_CREX)
 
   sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
   sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -141,21 +144,28 @@ if (rank==0):
               break
             protocol = mesg.split(',')[1].strip()
             if protocol == 'NETWORK':
-              while True:
-                try:
-                  semaphore = posix_ipc.Semaphore('MATSEM')
-                  break
-                except:
-                  time.sleep(1)
-                  continue
+              #while True:
+              #  try:
+              #    jq = sysv_ipc.MessageQueue(JQKEY)
+              #    semaphore = posix_ipc.Semaphore('MATSEM')
+              #    break
+              #  except:
+              #    time.sleep(1)
+              #    continue
               mesg_len = int(mesg.split()[-1])
-              semaphore.acquire()
-              memory = posix_ipc.SharedMemory('MAT2SHM')
-              mapfile = mmap.mmap(memory.fd, memory.size)
-              os.close(memory.fd)
-              mesg_dat = shmemUtils.read_from_memory(mapfile, mesg_len)
+              #semaphore.acquire()
+              #memory = posix_ipc.SharedMemory('MAT2SHM')
+              #mapfile = mmap.mmap(memory.fd, memory.size)
+              #os.close(memory.fd)
+              #mesg_dat = shmemUtils.read_from_memory(mapfile, mesg_len)
               #print mesg_dat
-              semaphore.release()
+              #semaphore.release()
+
+              #import pdb; pdb.set_trace()
+
+              (mesg_dat, mesg_size) = jq.receive()
+              mesg_dat = mesg_dat[:mesg_size]
+
               mesg = mesg.strip() + ':' + mesg_dat + '\n'
 
             # Determine the rank of the next worker:
@@ -197,7 +207,7 @@ if (rank==0):
             mesg_data = data.split(':')[-1]
             mesg_jobid = int(data.split(':')[-2])
 
-            mq.send(mesg_data, type=mesg_jobid)
+            rq.send(mesg_data, type=mesg_jobid)
       
           else:
             cnn.sendall(data)
@@ -205,13 +215,14 @@ if (rank==0):
         if(DEBUG):print 'All workers have sent back results.'
 
         cnn.close()
+        #jq.remove()
 
         q.put('running')
 
       if line == 'kill':
         print 'kill signal'
         kill = 1
-        mq.remove()
+        rq.remove()
         break
 
 # WORKER CONTROL:
@@ -265,7 +276,7 @@ else:
         shmemUtils.write_to_memory(mapfile, mesg_data)
         semaphore.release()
         conn.sendall(mesg)
-        time.sleep(1)
+        #time.sleep(1)
         #semaphore.acquire()
         #memory.unlink()
         #mapfile.close()
@@ -284,7 +295,7 @@ else:
             semaphore = posix_ipc.Semaphore('MATSEM')
             break
           except:
-            time.sleep(1)
+            #time.sleep(1)
             continue
         mesg_len = int(data.split(':')[-1])
         semaphore.acquire()
@@ -314,6 +325,7 @@ else:
 if(DEBUG):print 'kill is first ' + str(kill) + ' on rank ' + srank
 #mpiComm.bcast(kill, root=0, tag=KILL_TAG)
 if (rank==0):
+  jq.remove()
   sock.close()
   kill = 1
   for i in range(1, size):

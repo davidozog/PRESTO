@@ -1,3 +1,7 @@
+* Get rid of evalin('caller', ...) calls on Master side
+
+* Change the mex files to use memcpy for assigning data
+
 * Send through shared memory and network
   load my_split.mat
   load my_shared.mat

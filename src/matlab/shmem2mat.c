@@ -16,13 +16,7 @@
 
 void get_shmem_mesg(UINT8_T *dat, int nbytes) {
 
-  const mwSize *dims;
-  
-/*  dims = mxAlloc( strlen( mesg ) * sizeof(*dims) ); */
-/*  dims = mxMalloc( 9 * sizeof(*dims) ); */
-
   mxArray *out;
-/*  mxCreateNumericArray(1, dims, mxINT8_CLASS, mxREAL); */
 
   char s[1024];
   char SHM_NAME[512] = "SHM2MAT";
