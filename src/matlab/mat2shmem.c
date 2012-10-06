@@ -22,13 +22,12 @@ int fd, rc, permissions;
 
 
 static void send_data_to_shmem(const mxArray *array_ptr) {
-  signed char   *pr, *pi;
+  signed char *pr;
   mwSize total_num_of_elements, index;
 
   permissions = (int)strtol("0600", NULL, 8);
 
   pr = (signed char *)mxGetData(array_ptr);
-  pi = (signed char *)mxGetImagData(array_ptr);
   total_num_of_elements = mxGetNumberOfElements(array_ptr);
 
   /*
@@ -196,9 +195,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     exit(-1);
   }
 
-  if (ret)
-  for (i=0; i<nrhs; i++)  {
-    send_data_to_shmem(prhs[i]);
+
+  if (ret) {
+    send_data_to_shmem(prhs[0]);
   }
     
   close_shmem_and_semaphore();

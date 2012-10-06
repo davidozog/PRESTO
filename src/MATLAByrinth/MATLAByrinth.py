@@ -30,9 +30,11 @@ RQKEY = 48963
 
 def launch_matlab(queue, worker_dict):
   # Without GUI:
-  p = subprocess.Popen(MATLAB_BIN + ' -nodesktop -nosplash -r \"'+ worker_dict + '\"', shell=True)
+  p = subprocess.Popen(MATLAB_BIN + ' -nodesktop -nosplash -r \"'+ 
+                       worker_dict + '\"', shell=True)
   # With GUI:
-  #p = subprocess.Popen(MATLAB_BIN + ' -desktop -r \"'+ worker_dict + '\"', shell=True)
+  #p = subprocess.Popen(MATLAB_BIN + ' -desktop -r \"'+ worker_dict + 
+  #                     '\"', shell=True)
   queue.put('running')
   p.communicate()
   # send kill signal to all workers
@@ -61,7 +63,17 @@ def master_shmem_initiailization():
   except:
     pass
  
-#def worker_shmem_initiailization():
+def worker_shmem_initiailization():
+  try:
+    memory = posix_ipc.SharedMemory('SHM2MAT')
+    memory.unlink()
+  except:
+    pass
+  try:
+    semaphore = posix_ipc.Semaphore('PYSEM')
+    semaphore.unlink()
+  except:
+    pass
 
 # Initialize mpi4py:
 mpiComm = MPI.COMM_WORLD
@@ -173,15 +185,29 @@ if (rank==0):
               destination = (destination + 1) % size
             else:
               destination = 1
-            # If all workers are busy wait for a result and send to that worker.
+            # If all workers are busy wait for a result and 
+            # send new job to that worker.
             if len(running_jobs) == size-1:
               #TODO: this could be a function:
               if(DEBUG):print running_jobs; print '     master waiting for a free worker...'
               data = mpiComm.recv(source=MPI.ANY_SOURCE, tag=RESULTS_TAG, status=master_status)
               if(DEBUG):print '     GOT extra RESULT:' + data
               running_jobs.remove(master_status.source)
-              cnn.sendall(data)
-              mpiComm.send(mesg, dest=master_status.source, tag=DO_WORK_TAG)
+
+              if protocol == 'NETWORK':
+                result_mesg = ':'.join(data.split(':')[:-1]) + '\n'
+                cnn.sendall(result_mesg)
+
+                mesg_data = data.split(':')[-1]
+                mesg_jobid = int(data.split(':')[-2])
+
+                rq.send(mesg_data, type=mesg_jobid)
+      
+              else:
+                cnn.sendall(data)
+
+              mpiComm.send(mesg, dest=master_status.source, 
+                           tag=DO_WORK_TAG)
               running_jobs.append(master_status.source)
               master_status = MPI.Status()
             else:
@@ -199,7 +225,8 @@ if (rank==0):
           running_jobs.remove(master_status.source)
           master_status = MPI.Status()
 
-          # TODO - send data to shmem - using a new shmem segment with a message queue
+          # TODO - send data to shmem - using a new shmem 
+          # segment with a message queue
           if protocol == 'NETWORK':
             result_mesg = ':'.join(data.split(':')[:-1]) + '\n'
             cnn.sendall(result_mesg)
@@ -243,6 +270,10 @@ else:
   alive = conn.recv(1024)
   kill = None
 
+  worker_shmem_initiailization()
+  memory = posix_ipc.SharedMemory('SHM2MAT', posix_ipc.O_CREX, size=4096)
+  semaphore = posix_ipc.Semaphore('PYSEM', posix_ipc.O_CREX)
+
   # Wait for a message from the Master to do work
   while (kill != 1):
     worker_status = MPI.Status()
@@ -256,33 +287,15 @@ else:
         mesg_data = mesg.split(':')[-1].strip()
         print "worker mesg_data is " + mesg_data
 
-        # TODO: Fix this - why can't I open an already existing shmem / semaphore?
-        #memory = posix_ipc.SharedMemory('SHM2MAT', posix_ipc.O_CREX, size=4096)
-        #semaphore = posix_ipc.Semaphore('PYSEM', posix_ipc.O_CREX)
-        try:
-          memory = posix_ipc.SharedMemory('SHM2MAT', posix_ipc.O_CREX, size=4096)
-        except:
-          memory = posix_ipc.SharedMemory('SHM2MAT')
-          memory.unlink()
-          memory = posix_ipc.SharedMemory('SHM2MAT', posix_ipc.O_CREX, size=4096)
-        try:
-          semaphore = posix_ipc.Semaphore('PYSEM', posix_ipc.O_CREX)
-        except:
-          semaphore = posix_ipc.Semaphore('PYSEM')
-          semaphore.unlink()
-          semaphore = posix_ipc.Semaphore('PYSEM', posix_ipc.O_CREX)
+        memory = posix_ipc.SharedMemory('SHM2MAT')
+        semaphore = posix_ipc.Semaphore('PYSEM')
         mapfile = mmap.mmap(memory.fd, memory.size)
-        #memory.close_fd()
         shmemUtils.write_to_memory(mapfile, mesg_data)
         semaphore.release()
         conn.sendall(mesg)
-        #time.sleep(1)
-        #semaphore.acquire()
-        #memory.unlink()
-        #mapfile.close()
         
       else:
-        # Send work message (func_name, 'split_file.mat', 'shared_file.mat')
+        # Send work message (func_name,'split_file.mat','shared_file.mat')
         conn.sendall(mesg)
 
       # Wait for results (filename):
@@ -297,14 +310,15 @@ else:
           except:
             #time.sleep(1)
             continue
-        mesg_len = int(data.split(':')[-1])
+        mesg_len = int(data.split(':')[-2])
+        jobid = int(data.split(':')[-1])
         semaphore.acquire()
         memory = posix_ipc.SharedMemory('MAT2SHM')
         mapfile = mmap.mmap(memory.fd, memory.size)
         os.close(memory.fd)
         shm_data = shmemUtils.read_from_memory(mapfile, mesg_len)
         semaphore.release()
-        data = data.strip() + ':' + srank + ':' + shm_data
+        data = data.strip() + ':' + shm_data
 
       # Send results (filename) back to master:
       mpiComm.send(data, dest=0, tag=RESULTS_TAG)

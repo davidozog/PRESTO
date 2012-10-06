@@ -68,10 +68,11 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
 
     % serialize a cell containing the split objects
     splitVarStr = '';
-    for i=1:length(varargin{2})
+    num_split_objects = length(varargin{2});
+    for i=1:num_split_objects
       splitVarStr = [splitVarStr, varargin{2}{i}, ', '];
     end
-  fprintf(1, ['splitVarStr is ', splitVarStr]);
+    %fprintf(1, ['splitVarStr is ', splitVarStr]);
 
     % Get size of first variable and assume it's the number of jobs
     num_jobs = evalin('caller', ['length(', varargin{2}{1}, ')']);
@@ -83,19 +84,23 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
     end
 
     shmem_size = zeros(num_jobs, 1);
-    % TODO: make m1, m2, ... all separate splits of data
     for i=1:num_jobs
-      evalin('caller', ['m',num2str(i),'=serialize({',splitVarStr,sharedVarStr,'});']);
-      shmem_size(i) = evalin('caller', ['length(m',num2str(i),')']);
+      job_str = '';
+      for j=1:num_split_objects
+        job_str = [job_str, varargin{2}{j},'(',num2str(i),'),']
+      end
+        evalin('caller', ['m',num2str(i),'=serialize({',job_str,...
+               sharedVarStr,'});']);
+        shmem_size(i) = evalin('caller', ['length(m',num2str(i),')']);
     end
 
     mesg{num_jobs} = '';
     for j = 1:num_jobs
       jobid = int2str(j);
-      mesg{j} = horzcat(remote_method, ', ', varargin{1}, ', ', jobid, ', ', './.split_', jobid, '.mat, ', int2str(shmem_size(j)));
+      mesg{j} = horzcat(remote_method, ', ', varargin{1}, ', ', ...
+                    jobid, ', ', './.split_', jobid, '.mat, ', ...
+                    int2str(shmem_size(j)));
     end
-    mesg{3}(1)
-
     
   end % mode 3
 
@@ -115,17 +120,15 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
     out.println(mesg{i});
   end
 
+  % This is a 'done' message.  Don't change it.
   out.println('done');
 
-  % TODO Create string of 'm1, m2, ...' arrays and pass that instead
   if mode==3
-    fprintf('before shmem');
-    %evalin('caller', ['mat2shmemQ( [m1, m2, m3] )';]);
+    fprintf('before master shmem');
     for i=1:num_jobs
       evalin('caller', ['mat2shmemQ( m', num2str(i), ', ', ...
                 num2str(shmem_size(i)), ', ', num2str(i), ')']);
     end
-    %evalin('caller', ['mat2shmem(m1)';]);
     fprintf('after master shmem');
   end
 

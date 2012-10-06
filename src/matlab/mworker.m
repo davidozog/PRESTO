@@ -61,15 +61,17 @@ function mworker(my_hostname, rank)
           %evalin('caller', ['stingray_data = shmem2mat(',shmem_size,')']);
           stingray_data = shmem2mat(str2num(shmem_size));
           SD = deserialize(stingray_data)
-          SD{1}(rank)
+          SD
+          SD{1}
+          %SD(1)
           SD{3}
 
           % Call the function:
-          [ret1 ret2]  = fh(SD{1}(rank), SD{3})
+          [ret1 ret2]  = fh(SD{1}, SD{3})
 
           % Write results to shmem and pass to python worker process 
           ret = serialize({ret1, ret2})
-          out.println(['shmem_data:', num2str(length(ret))]);
+          out.println(['shmem_data:', num2str(length(ret)), ':', jobid]);
           mat2shmem(ret);
 
 

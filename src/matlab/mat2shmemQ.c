@@ -57,9 +57,6 @@ void put_shmem_mesg(const mxArray *array_ptr, int jobid, double *size) {
 }
 
 
-
-
-
 /*  MEX GATEWAY  */
 void mexFunction( int nlhs, mxArray *plhs[],
                   int nrhs, const mxArray *prhs[] )
