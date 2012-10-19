@@ -17,7 +17,7 @@
 
 struct my_msgbuf {
     long mtype;
-    signed char mdata[2048];
+    signed char mdata[2024];
 };
 
 

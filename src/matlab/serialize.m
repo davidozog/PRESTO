@@ -56,6 +56,8 @@ function m = serializeMatrix(v)
 	% Data.
 	if ischar(v)
 		m = [m; uint8(v(:))];
+  elseif islogical(v) 
+    m = [m; double(v)];
 	else
 		m = [m; typecast(v(:).', 'uint8').'];
 	end

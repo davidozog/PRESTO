@@ -2,14 +2,23 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
 
   nVarargs = length(varargin);
 
-  % Mode 1 : user supplied his own 'split' and 'shared' .mat files
-  %          i.e.  send_jobs_to_workers('myfunc', 'NFS', 'my_split.mat', 'my_shared.mat')
-  % Mode 2 : launch a single job with the given objects ...
-  %          i.e.  send_jobs_to_workers('myfunc', 'object1', 'object2', ...)
-  % TODO: Make Mode 2 asynchronous...
-  % Mode 3 : pass objects to a mex file
-  %          i.e   send_jobs_to_workers('myfunc', 'NETWORK', {split: 'object1', 'object2', ...} 
-  %                                               {shared: 'object3', 'object4', ...})
+  % Mode 1:
+  %  Supplied 'split' and 'shared' .mat files.  For example:
+  %      send_jobs_to_workers('myfunc', 'NFS', 'my_split.mat', 'my_shared.mat')
+  %
+  % Mode 2 : 
+  %  Launched a single job with the given objects.  For example:
+  %      send_jobs_to_workers('myfunc', 'object1', 'object2', ...)
+  %  TODO: Make this mode asynchronous...
+  %
+  % Mode 3 : 
+  %  Pass a list of split and shared object names. For example, 
+  %      send_jobs_to_workers('myfunc', 'NETWORK', ...
+  %                           {'split_object1', 'split_object2', ...}, ...
+  %                           {'shared_object1', 'shared_object2', ...})
+  %  This will serialize the collection of data messages and send
+  %  them over the network through shared memory.
+
   firstvar = varargin{1};
   mode=1;
   try
@@ -39,7 +48,8 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
       aStation = aStation_(j);
       tlMisfit_sub = tlMisfit_sub_(j);
       save(horzcat('.split_', jobid, '.mat'), 'aStation', 'tlMisfit_sub');
-      mesg{j} = horzcat(remote_method, ', ', varargin{1}, ', ', jobid, ', ', './.split_', jobid, '.mat, ', varargin{3});
+      mesg{j} = horzcat(remote_method, ', ', varargin{1}, ', ', jobid, ...
+                        ', ', './.split_', jobid, '.mat, ', varargin{3});
     end
   end
 
@@ -63,6 +73,8 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
 
   % MODE 3:
   if mode==3
+
+    yrinth_str = 'm_a_t_l_a_b__y_r_i_n_t_h_';
     %NSplit = find(strcmp(varargin{2}, 'shared'));
     %stingrayObj(varargin{2}(2:NSplit-1), varargin{2}(NSplit+1:end));
 
@@ -87,11 +99,13 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
     for i=1:num_jobs
       job_str = '';
       for j=1:num_split_objects
-        job_str = [job_str, varargin{2}{j},'(',num2str(i),'),']
+        job_str = [job_str, varargin{2}{j},'(',num2str(i),'),'];
       end
-        evalin('caller', ['m',num2str(i),'=serialize({',job_str,...
+        job_str
+        sharedVarStr
+        evalin('caller', [yrinth_str,num2str(i),'=serialize({',job_str,...
                sharedVarStr,'});']);
-        shmem_size(i) = evalin('caller', ['length(m',num2str(i),')']);
+        shmem_size(i) = evalin('caller', ['length(',yrinth_str,num2str(i),')']);
     end
 
     mesg{num_jobs} = '';
@@ -120,13 +134,13 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
     out.println(mesg{i});
   end
 
-  % This is a 'done' message.  Don't change it.
+  % This is the 'done' message.  Don't change it.
   out.println('done');
 
   if mode==3
     fprintf('before master shmem');
     for i=1:num_jobs
-      evalin('caller', ['mat2shmemQ( m', num2str(i), ', ', ...
+      evalin('caller', ['mat2shmemQ(',yrinth_str,num2str(i), ', ', ...
                 num2str(shmem_size(i)), ', ', num2str(i), ')']);
     end
     fprintf('after master shmem');
@@ -135,11 +149,11 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
   % Receive all finished jobs from workers:
   results = cell(1,num_jobs);
   jobs_accounted_for = 0;
+  tic
   while ( jobs_accounted_for < num_jobs )
     try
       fromMPI = in.readLine();
     catch
-      pause(1)
       continue
     end
     fromMPI = char(fromMPI);
@@ -149,6 +163,7 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
       results(jobs_accounted_for) = {fromMPI};
     end
   end
+  toc
 
   % I have all the results now, so put them into the output objects 
   %TODO: split this loop and call shmResult() with a list of (jobid, datasize) pairs

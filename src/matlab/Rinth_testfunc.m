@@ -1,4 +1,4 @@
-function [A0_sub tlMisfit_sub] = Rinth_testfunc(aStation, srModel)
+function [A0_sub tlMisfit_sub] = Rinth_testfunc(aStation, tlMisfit_sub, srModel)
 %function [A0_sub tlMisfit_sub] = Rinth_testfunc(split_filepath, shared_filepath)
 %  load(split_filepath)
 %  load(shared_filepath)

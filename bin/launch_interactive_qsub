@@ -22,7 +22,7 @@ if count:
   print len(out)
   sys.exit()
 
-qsub_command = 'qsub -q generic -I -X -d $PWD -l nodes='
+qsub_command = 'qsub -q generic -I -X -d $PWD -l walltime=24:00:00 -l nodes='
 
 notification = 'selecting nodes: '
 for nodename in out[:num_nodes]:
