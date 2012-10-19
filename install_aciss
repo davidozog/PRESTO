@@ -46,8 +46,11 @@ echo -e '\texport PATH=$PATH:$MATLABYRINTH/bin\n'
 
 echo 'If it does not already exist, create a Matlab startup file:'
 echo -e '\t~/Documents/MATLAB/startup.m'
-echo 'and append this line to the startup.m file:'
-echo -e '\taddpath '$PWD'/src/matlab\n'
+echo 'and append these lines to the startup.m file:'
+echo -e '\tif isempty( getenv( 'MATLABYRINTH' ) )'
+echo -e '\t\tdisplay('Please set the MATLABYRINTH environment variable' );'
+echo -e '\telse'
+echo -e '\t\taddpath( [getenv( 'MATLABYRINTH' ) , 'src/matlab'] );'
+echo -e '\tend'
 
 echo -e 'Refer to the README to see how to test the installation.\n'
-
