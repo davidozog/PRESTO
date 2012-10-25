@@ -1,8 +1,9 @@
 function [A B] = send_jobs_to_workers(remote_method, varargin)
 
+  DEBUG = 1;
   nVarargs = length(varargin);
 
-  % Mode 1:
+  % Mode 1 :
   %  Supplied 'split' and 'shared' .mat files.  For example:
   %      send_jobs_to_workers('myfunc', 'NFS', 'my_split.mat', 'my_shared.mat')
   %
@@ -18,6 +19,12 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
   %                           {'shared_object1', 'shared_object2', ...})
   %  This will serialize the collection of data messages and send
   %  them over the network through shared memory.
+  %
+  % Mode 4 :
+  %  Keeps .mat object files in memory by writing to tmpfs and sending
+  %  them as buffers over MPI.  For example,
+  %      send_jobs_to_workers('myfunc', 'TMPFS', {'split1', 'split2'}, ...
+  %                           {'shared1', 'shared2'})
 
   firstvar = varargin{1};
   mode=1;
@@ -26,6 +33,8 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
       mode = 1;
     elseif strcmp(firstvar, 'NETWORK')
       mode = 3;
+    elseif strcmp(firstvar, 'TMPFS')
+      mode = 4;
     else 
       mode = 2;
     end
@@ -36,9 +45,10 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
   % MODE 1:
   if mode==1
     load(varargin{2})
-    W = whos;
+    %W = whos;
     %num_jobs = length(W(1).size);
-    num_jobs = W(1).size(1);
+    %num_jobs = W(1).size(1)
+    num_jobs = length(aStation)
     aStation_ = aStation;
     tlMisfit_sub_ = tlMisfit_sub;
     mesg{num_jobs} = '';
@@ -75,8 +85,6 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
   if mode==3
 
     yrinth_str = 'm_a_t_l_a_b__y_r_i_n_t_h_';
-    %NSplit = find(strcmp(varargin{2}, 'shared'));
-    %stingrayObj(varargin{2}(2:NSplit-1), varargin{2}(NSplit+1:end));
 
     % serialize a cell containing the split objects
     splitVarStr = '';
@@ -84,7 +92,6 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
     for i=1:num_split_objects
       splitVarStr = [splitVarStr, varargin{2}{i}, ', '];
     end
-    %fprintf(1, ['splitVarStr is ', splitVarStr]);
 
     % Get size of first variable and assume it's the number of jobs
     num_jobs = evalin('caller', ['length(', varargin{2}{1}, ')']);
@@ -101,8 +108,6 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
       for j=1:num_split_objects
         job_str = [job_str, varargin{2}{j},'(',num2str(i),'),'];
       end
-        job_str
-        sharedVarStr
         evalin('caller', [yrinth_str,num2str(i),'=serialize({',job_str,...
                sharedVarStr,'});']);
         shmem_size(i) = evalin('caller', ['length(',yrinth_str,num2str(i),')']);
@@ -117,6 +122,50 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
     end
     
   end % mode 3
+
+
+  % MODE 4:
+  if mode==4
+    yrinth_str = 'm_a_t_l_a_b__y_r_i_n_t_h_';
+    TMPFS_PATH = '/dev/shm/';
+
+    % serialize a cell containing the split objects
+    splitVarStr = '';
+    num_split_objects = length(varargin{2});
+    for i=1:num_split_objects
+      splitVarStr = [splitVarStr, varargin{2}{i}, ', '];
+    end
+    %fprintf(1, ['splitVarStr is ', splitVarStr]);
+
+    % Get size of first variable and assume it's the number of jobs
+    num_jobs = evalin('caller', ['length(', varargin{2}{1}, ')']);
+    if(DEBUG); fprintf(1, ['num_jobs is : ', num2str(num_jobs), '\n']); end
+
+    for i=1:num_jobs
+      job_str = '''';
+      mesg{num_jobs} = '';
+      jobid = int2str(i);
+      for j=1:num_split_objects
+        splitID = int2str(j);
+        job_str = [job_str, yrinth_str, splitID, ''', '''];
+        evalin('caller', [yrinth_str,splitID,'=', varargin{2}{j},'(',jobid,');']);
+      end
+      for k=1:length(varargin{3})
+        splitID = int2str(k+j);
+        evalin('caller', [yrinth_str,splitID,'=', varargin{3}{k}, ';']);
+        job_str = [job_str, yrinth_str, splitID, ''', '''];
+      end
+      job_str = job_str(1:end-3);
+
+      save_str = ['''', TMPFS_PATH, '.jd_', jobid, '.mat'', ', job_str];
+      evalin('caller', ['save(', save_str , ')']);
+
+      mesg{i} = [remote_method, ', ', varargin{1}, ', ', jobid, ...
+                        ', ', TMPFS_PATH, '.jd_', jobid, '.mat,'];
+    end
+
+  end
+
 
   import java.io.*;
   import java.net.*;
@@ -138,18 +187,15 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
   out.println('done');
 
   if mode==3
-    fprintf('before master shmem');
     for i=1:num_jobs
       evalin('caller', ['mat2shmemQ(',yrinth_str,num2str(i), ', ', ...
                 num2str(shmem_size(i)), ', ', num2str(i), ')']);
     end
-    fprintf('after master shmem');
   end
 
   % Receive all finished jobs from workers:
   results = cell(1,num_jobs);
   jobs_accounted_for = 0;
-  tic
   while ( jobs_accounted_for < num_jobs )
     try
       fromMPI = in.readLine();
@@ -158,12 +204,11 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
     end
     fromMPI = char(fromMPI);
     if length(fromMPI>0)
-      fprintf(1, horzcat('Master:(received): ', fromMPI, '\n'));
+      if(DEBUG); fprintf(1, horzcat('Master:(received): ', fromMPI, '\n')); end
       jobs_accounted_for = jobs_accounted_for + 1;
       results(jobs_accounted_for) = {fromMPI};
     end
   end
-  toc
 
   % I have all the results now, so put them into the output objects 
   %TODO: split this loop and call shmResult() with a list of (jobid, datasize) pairs
@@ -181,11 +226,10 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
       %evalin('caller', ['r',num2str(i),'=[',char(shmem_size), ', ', char(result_rank),'];']);
     end
     
-      
-    fprintf(1, ['Master GETTING RESULTS ...']);
-    % TODO: These have to be sorted first!
+
+    % Getting results...
     for i=1:length(results)
-      R{i} = shmResult2mat(res_arg{i})
+      R{i} = shmResult2mat(res_arg{i});
     end
 
     for i=1:length(results)

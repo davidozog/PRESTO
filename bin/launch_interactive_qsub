@@ -14,7 +14,7 @@ except:
 
 
 
-command = 'get_free_nodes generic'
+command = 'get_free_nodes gpu'
 out = subprocess.check_output(command, shell=True)
 out = out.split()
 
@@ -22,7 +22,7 @@ if count:
   print len(out)
   sys.exit()
 
-qsub_command = 'qsub -q generic -I -X -d $PWD -l walltime=24:00:00 -l nodes='
+qsub_command = 'qsub -q gpu -I -X -d $PWD -l walltime=24:00:00 -l nodes='
 
 notification = 'selecting nodes: '
 for nodename in out[:num_nodes]:

@@ -137,48 +137,47 @@ if (rank==0):
         #import pdb; pdb.set_trace()
         while mesg!='kill':
           if(DEBUG):print '     master waiting for work...'
+          mesg = ''
           if mesg_q.qsize() > 0:
             mesg = mesg_q.get() + '\n'
+            print 'getting T mesg :' + mesg
             fromq = True
           else:
-            mesg = cnn.recv(1024)
+            mesg = cnn.recv(4096)
+            print "Got new message(s)"
             fromq = False
-          # why is 'filter' here?  TODO:
+          # why is 'filter' here?  
           mesg_split = filter(None, mesg.split('\n'))
-          for m in mesg_split:
-            if len(m) > 0 and (m) != mesg:
-              mesg_q.put(m)
+          if not fromq:
+            for m in mesg_split:
+              print 'm is :' + m
+              print 'mesg is :' + mesg
+              if len(m) > 0 and (m) != mesg:
+                print ' *************** putting msg :' + m
+                mesg_q.put(m)
           if mesg_q.qsize > 0 and not fromq:
             mesg = mesg_q.get() + '\n'
+            print 'getting F mesg :' + mesg
           if (len(mesg) > 0):
             if(DEBUG):print '     master message is ' + mesg 
             if mesg == 'done\n':
               break
             protocol = mesg.split(',')[1].strip()
             if protocol == 'NETWORK':
-              #while True:
-              #  try:
-              #    jq = sysv_ipc.MessageQueue(JQKEY)
-              #    semaphore = posix_ipc.Semaphore('MATSEM')
-              #    break
-              #  except:
-              #    time.sleep(1)
-              #    continue
               mesg_len = int(mesg.split()[-1])
-              #semaphore.acquire()
-              #memory = posix_ipc.SharedMemory('MAT2SHM')
-              #mapfile = mmap.mmap(memory.fd, memory.size)
-              #os.close(memory.fd)
-              #mesg_dat = shmemUtils.read_from_memory(mapfile, mesg_len)
-              #print mesg_dat
-              #semaphore.release()
-
-              #import pdb; pdb.set_trace()
-
               (mesg_dat, mesg_size) = jq.receive()
               mesg_dat = mesg_dat[:mesg_size]
 
               mesg = mesg.strip() + ':' + mesg_dat + '\n'
+
+            if protocol == 'TMPFS':
+              if(DEBUG):print 'TMPFS msg is ' + mesg.split(',')[3].strip()
+              print 'TMPFS msg is ' + mesg
+              print 'TMPFS msg is ' + mesg.split(',')[3].strip()
+              tmpfs_file = open(mesg.split(',')[3].strip(), 'rb')
+              mesg_dat = tmpfs_file.read()
+              mesg = mesg.strip() + ':' + mesg_dat + '\n'
+                
 
             # Determine the rank of the next worker:
             if (destination != size-1):
@@ -189,25 +188,42 @@ if (rank==0):
             # send new job to that worker.
             if len(running_jobs) == size-1:
               #TODO: this could be a function:
-              if(DEBUG):print running_jobs; print '     master waiting for a free worker...'
-              data = mpiComm.recv(source=MPI.ANY_SOURCE, tag=RESULTS_TAG, status=master_status)
-              if(DEBUG):print '     GOT extra RESULT:' + data
+              if(DEBUG):
+                print running_jobs 
+                print '     master waiting for a free worker...'
+
+              data = mpiComm.recv(source=MPI.ANY_SOURCE, \
+                                  tag=RESULTS_TAG,       \
+                                  status=master_status)
+
+              #if(DEBUG):print '     GOT extra RESULT:' + data
+              if(DEBUG):print '     GOT extra RESULT:' 
+
               running_jobs.remove(master_status.source)
 
               if protocol == 'NETWORK':
                 result_mesg = ':'.join(data.split(':')[:-1]) + '\n'
+
                 cnn.sendall(result_mesg)
 
                 mesg_data = data.split(':')[-1]
                 mesg_jobid = int(data.split(':')[-2])
 
                 rq.send(mesg_data, type=mesg_jobid)
+
+              elif protocol == 'TMPFS':
+                TMPFS_PATH = '/dev/shm/'
+                jobid = data[:data.find(':')]
+                print 'JOBID: ' + jobid
+                results_file = open(TMPFS_PATH + '.results_' + jobid + '.mat', 'wb')
+                results_file.write(data[data.find(':')+1:])
+                results_file.close()
+                cnn.sendall(results_file.name + '\n')
       
               else:
                 cnn.sendall(data)
 
-              mpiComm.send(mesg, dest=master_status.source, 
-                           tag=DO_WORK_TAG)
+              mpiComm.send(mesg, dest=master_status.source, tag=DO_WORK_TAG)
               running_jobs.append(master_status.source)
               master_status = MPI.Status()
             else:
@@ -221,12 +237,10 @@ if (rank==0):
           #TODO: this could be a function
           if(DEBUG):print running_jobs; print '     master waiting for results...'
           data = mpiComm.recv(source=MPI.ANY_SOURCE, tag=RESULTS_TAG, status=master_status)
-          if(DEBUG):print 'GOT RESULT:' + data
+          #if(DEBUG):print 'GOT RESULT:' + data
           running_jobs.remove(master_status.source)
           master_status = MPI.Status()
 
-          # TODO - send data to shmem - using a new shmem 
-          # segment with a message queue
           if protocol == 'NETWORK':
             result_mesg = ':'.join(data.split(':')[:-1]) + '\n'
             cnn.sendall(result_mesg)
@@ -235,6 +249,15 @@ if (rank==0):
             mesg_jobid = int(data.split(':')[-2])
 
             rq.send(mesg_data, type=mesg_jobid)
+
+          elif protocol == 'TMPFS':
+            TMPFS_PATH = '/dev/shm/'
+            jobid = data[:data.find(':')]
+            print 'JOBID: ' + jobid
+            results_file = open(TMPFS_PATH + '.results_' + jobid + '.mat', 'wb')
+            results_file.write(data[data.find(':')+1:])
+            results_file.close()
+            cnn.sendall(results_file.name + '\n')
       
           else:
             cnn.sendall(data)
@@ -267,7 +290,7 @@ else:
   s.listen(1)
   conn, addr = s.accept()
   print 'Worker connected: ', addr
-  alive = conn.recv(1024)
+  alive = conn.recv(4096)
   kill = None
 
   worker_shmem_initiailization()
@@ -280,12 +303,13 @@ else:
     mesg = mpiComm.recv(source=0, tag=MPI.ANY_TAG, status=worker_status)
     protocol = mesg.split(',')[1].strip()
     if (worker_status.tag == DO_WORK_TAG):
-      if(DEBUG):print 'P'+srank+':(sending): do_work ( ' + mesg + ' ) ' 
+
+      #if(DEBUG):print 'W'+srank+':(sent): do_work ( ' + mesg + ' ) ' 
       
       # Send byte array to Matlab worker via shmem
       if protocol == 'NETWORK':
         mesg_data = mesg.split(':')[-1].strip()
-        print "worker mesg_data is " + mesg_data
+        if(DEBUG):print "worker mesg_data is " + mesg_data
 
         memory = posix_ipc.SharedMemory('SHM2MAT')
         semaphore = posix_ipc.Semaphore('PYSEM')
@@ -293,14 +317,23 @@ else:
         shmemUtils.write_to_memory(mapfile, mesg_data)
         semaphore.release()
         conn.sendall(mesg)
+
+      elif protocol == 'TMPFS':
+        worker_tmpfs_file = open(mesg.split(',')[3].strip(), 'wb')
+        worker_tmpfs_file.write(mesg[mesg.find(':')+1:])
+        worker_tmpfs_file.close()
+        mesg = mesg.split(':')[0]
+        mesg = mesg + '\n'
+        conn.sendall(mesg)
         
       else:
         # Send work message (func_name,'split_file.mat','shared_file.mat')
         conn.sendall(mesg)
 
+
       # Wait for results (filename):
-      data = conn.recv(1024)
-      if(DEBUG):print 'P'+srank+':(received): ' + data
+      data = conn.recv(4096)
+      if(DEBUG):print 'W'+srank+':(finished/received): ' + data
 
       if protocol == 'NETWORK':
         while True:
@@ -319,6 +352,12 @@ else:
         shm_data = shmemUtils.read_from_memory(mapfile, mesg_len)
         semaphore.release()
         data = data.strip() + ':' + shm_data
+
+      elif protocol == 'TMPFS':
+        results_file = open(data.strip(), 'rb')
+        idx = data.find('_')
+        jobid = data[idx+1:data.find('.',idx+1)]
+        data = jobid + ':' + results_file.read()
 
       # Send results (filename) back to master:
       mpiComm.send(data, dest=0, tag=RESULTS_TAG)

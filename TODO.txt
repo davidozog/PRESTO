@@ -1,3 +1,9 @@
+* Eliminate debug information
+
+* move to /scratch and send .mat as buffer
+
+* move to tmpfs    "  "      "   "
+
 * Get rid of evalin('caller', ...) calls on Master side
 
 * Change the mex files to use memcpy for assigning data
