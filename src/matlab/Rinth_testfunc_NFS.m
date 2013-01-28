@@ -4,7 +4,7 @@ function [A0_sub tlMisfit_sub] = Rinth_testfunc_NFS(split_filepath, shared_filep
   load(shared_filepath)
   fprintf(2, horzcat('hi from matlab - shared_filepath is ', shared_filepath, ' \n'))
   
-  station = str2num(char(aStation));
+  station = str2num(char(aStation))
   A0_sub.A0 = [station station; station station] + srModel;
   tlMisfit_sub.bvec = [station];
   tlMisfit_sub.res = [station];

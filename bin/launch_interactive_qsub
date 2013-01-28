@@ -1,28 +1,37 @@
 #!/usr/bin/env python
 import subprocess
 import sys
+import os
 
 count = False
+init = False
 try:
   arg1 = sys.argv[1]
   if arg1 == 'count':
     count = True
+  elif arg1 == 'init':
+    init = True
+    num_nodes = 8
   else:
     num_nodes = int(sys.argv[1])
 except:
   sys.exit('ERROR: Need to know how many nodes you want (or "count" the nodes).')
 
 
-
-command = 'get_free_nodes gpu'
+command = 'get_free_nodes generic'
 out = subprocess.check_output(command, shell=True)
 out = out.split()
 
 if count:
   print len(out)
   sys.exit()
-
-qsub_command = 'qsub -q gpu -I -X -d $PWD -l walltime=24:00:00 -l nodes='
+elif init:
+  print 'Initiating MATLAByrinth speed test'
+  rinth_path = os.environ['MATLABYRINTH'] + 'examples/init_test/'
+  qsub_command = 'qsub -q generic ' + rinth_path + \
+                 'init_test.sh -d $PWD -l walltime=24:00:00 -l nodes='
+else:	
+  qsub_command = 'qsub -q generic -I -X -d $PWD -l walltime=24:00:00 -l nodes='
 
 notification = 'selecting nodes: '
 for nodename in out[:num_nodes]:
@@ -33,5 +42,7 @@ qsub_command = qsub_command[:-1]
 notification = notification[:-2]
 
 print notification
+
+print qsub_command
 
 launch_stat = subprocess.call(qsub_command, shell=True)

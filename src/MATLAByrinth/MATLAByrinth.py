@@ -82,7 +82,7 @@ rank = mpiComm.Get_rank()
 name = MPI.Get_processor_name()
 srank = str(rank)
 
-print "Process %d of %d launched on %s." % (rank, size, name)
+print "Process %d of %d launched on %s." % (rank, size-1, name)
 
 # MASTER PROCESS:
 if (rank==0):
@@ -152,7 +152,7 @@ if (rank==0):
             for m in mesg_split:
               print 'm is :' + m
               print 'mesg is :' + mesg
-              if len(m) > 0 and (m) != mesg:
+              if len(m) > 0 and (m) != mesg and m is not None:
                 print ' *************** putting msg :' + m
                 mesg_q.put(m)
           if mesg_q.qsize > 0 and not fromq:
@@ -279,9 +279,10 @@ if (rank==0):
 else: 
   data = {'name': name, 'rank': rank}
   mpiComm.send(data, dest=0, tag=CHECKIN_TAG)
-  args = [MATLAB_BIN, '-nodesktop', '-nosplash', '-r', 'mworker(\''+name+'\', '+srank+')']  
+  #args = [MATLAB_BIN, '-nodesktop', '-nosplash', '-r', 'mworker(\''+name+'\', '+srank+')']  
+  cmd = MATLAB_BIN + ' -nosplash -r "mworker(\''+name+'\', '+srank+')" -nodesktop'
   #p = subprocess.Popen(args, stdout=subprocess.PIPE)
-  p = subprocess.Popen(args, stdout=open('worker'+srank+'.log', 'w'))
+  p = subprocess.Popen(cmd, stdout=open('worker'+srank+'.log', 'w'), stderr=open('worker'+srank+'.err', 'w'), shell=True)
 
   # Wait for "alive" message from each workers
   s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

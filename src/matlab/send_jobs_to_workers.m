@@ -1,6 +1,8 @@
 function [A B] = send_jobs_to_workers(remote_method, varargin)
 
   DEBUG = 1;
+  PPN = 5;
+
   nVarargs = length(varargin);
 
   % Mode 1 :
@@ -42,6 +44,17 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
     mode=2;
   end
 
+  try
+    parvar = varargin{4}
+    if varargin{4}
+      parmode = true
+    else 
+      parmode = false
+    end
+  catch
+    parmode = false
+  end
+
   % MODE 1:
   if mode==1
     load(varargin{2})
@@ -53,13 +66,33 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
     tlMisfit_sub_ = tlMisfit_sub;
     mesg{num_jobs} = '';
     % Split the split_file into individual jobs:
-    for j = 1:num_jobs
-      jobid = int2str(j);
-      aStation = aStation_(j);
-      tlMisfit_sub = tlMisfit_sub_(j);
-      save(horzcat('.split_', jobid, '.mat'), 'aStation', 'tlMisfit_sub');
-      mesg{j} = horzcat(remote_method, ', ', varargin{1}, ', ', jobid, ...
-                        ', ', './.split_', jobid, '.mat, ', varargin{3});
+    if parmode
+    
+      if mod(num_jobs, PPN) == 0
+        num_jobs = num_jobs/PPN;
+      else
+        num_jobs = num_jobs/PPN + 1;
+      end
+
+      for j = 1:num_jobs
+        jobid = int2str(j);
+        aStation = aStation_( (j-1)*PPN+1 : ((j-1)*PPN+PPN) );
+        tlMisfit_sub = tlMisfit_sub_( (j-1)*PPN+1 : ((j-1)*PPN+PPN) );
+        save(horzcat('.split_', jobid, '.mat'), 'aStation', 'tlMisfit_sub');
+        mesg{j} = horzcat(remote_method, ', ', varargin{1}, ', ', jobid, ...
+                          ', ', './.split_', jobid, '.mat, ', varargin{3}, ...
+                          ', ', 'P');
+      end
+
+    else
+      for j = 1:num_jobs
+        jobid = int2str(j);
+        aStation = aStation_(j);
+        tlMisfit_sub = tlMisfit_sub_(j);
+        save(horzcat('.split_', jobid, '.mat'), 'aStation', 'tlMisfit_sub');
+        mesg{j} = horzcat(remote_method, ', ', varargin{1}, ', ', jobid, ...
+                          ', ', './.split_', jobid, '.mat, ', varargin{3});
+      end
     end
   end
 
@@ -85,6 +118,10 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
   if mode==3
 
     yrinth_str = 'm_a_t_l_a_b__y_r_i_n_t_h_';
+
+    if parmode
+      error('PCT mode not supported with shared memory implementation');
+    end
 
     % serialize a cell containing the split objects
     splitVarStr = '';
@@ -131,7 +168,7 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
 
     % serialize a cell containing the split objects
     splitVarStr = '';
-    num_split_objects = length(varargin{2});
+    num_split_objects = length(varargin{2})
     for i=1:num_split_objects
       splitVarStr = [splitVarStr, varargin{2}{i}, ', '];
     end
@@ -140,30 +177,67 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
     % Get size of first variable and assume it's the number of jobs
     num_jobs = evalin('caller', ['length(', varargin{2}{1}, ')']);
     if(DEBUG); fprintf(1, ['num_jobs is : ', num2str(num_jobs), '\n']); end
-
-    for i=1:num_jobs
-      job_str = '''';
-      mesg{num_jobs} = '';
-      jobid = int2str(i);
-      for j=1:num_split_objects
-        splitID = int2str(j);
-        job_str = [job_str, yrinth_str, splitID, ''', '''];
-        evalin('caller', [yrinth_str,splitID,'=', varargin{2}{j},'(',jobid,');']);
+    if parmode
+    
+      if mod(num_jobs, PPN) == 0
+        num_jobs = num_jobs/PPN;
+      else
+        num_jobs = num_jobs/PPN + 1;
       end
-      for k=1:length(varargin{3})
-        splitID = int2str(k+j);
-        evalin('caller', [yrinth_str,splitID,'=', varargin{3}{k}, ';']);
-        job_str = [job_str, yrinth_str, splitID, ''', '''];
+
+      for i = 1:num_jobs
+
+        job_str = '''';
+        mesg{num_jobs} = '';
+        jobid = int2str(i);
+        fst = int2str((i-1)*PPN+1);
+        lst = int2str((i-1)*PPN+PPN);
+        jobrng = [fst,':',lst]
+
+        for j=1:num_split_objects
+          splitID = int2str(j);
+          job_str = [job_str, yrinth_str, splitID, ''', '''];
+          evalin('caller', [yrinth_str,splitID,'=', varargin{2}{j},'(',jobrng,');']);
+        end
+        for k=1:length(varargin{3})
+          splitID = int2str(k+j);
+          evalin('caller', [yrinth_str,splitID,'=', varargin{3}{k}, ';']);
+          job_str = [job_str, yrinth_str, splitID, ''', '''];
+        end
+        job_str = job_str(1:end-3);
+
+        save_str = ['''', TMPFS_PATH, '.jd_', jobid, '.mat'', ', job_str];
+        evalin('caller', ['save(', save_str , ')']);
+
+        mesg{i} = [remote_method, ', ', varargin{1}, ', ', jobid, ...
+                          ', ', TMPFS_PATH, '.jd_', jobid, '.mat, P'];
+
       end
-      job_str = job_str(1:end-3);
 
-      save_str = ['''', TMPFS_PATH, '.jd_', jobid, '.mat'', ', job_str];
-      evalin('caller', ['save(', save_str , ')']);
+    else
+      for i=1:num_jobs
+        job_str = '''';
+        mesg{num_jobs} = '';
+        jobid = int2str(i);
+        for j=1:num_split_objects
+          splitID = int2str(j);
+          job_str = [job_str, yrinth_str, splitID, ''', '''];
+          evalin('caller', [yrinth_str,splitID,'=', varargin{2}{j},'(',jobid,');']);
+        end
+        for k=1:length(varargin{3})
+          splitID = int2str(k+j);
+          evalin('caller', [yrinth_str,splitID,'=', varargin{3}{k}, ';']);
+          job_str = [job_str, yrinth_str, splitID, ''', '''];
+        end
+        job_str = job_str(1:end-3);
 
-      mesg{i} = [remote_method, ', ', varargin{1}, ', ', jobid, ...
-                        ', ', TMPFS_PATH, '.jd_', jobid, '.mat,'];
+        save_str = ['''', TMPFS_PATH, '.jd_', jobid, '.mat'', ', job_str];
+        evalin('caller', ['save(', save_str , ')']);
+
+        mesg{i} = [remote_method, ', ', varargin{1}, ', ', jobid, ...
+                          ', ', TMPFS_PATH, '.jd_', jobid, '.mat,'];
+      end
     end
-
   end
 
 
@@ -180,6 +254,7 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
   end
 
   for i=1:num_jobs
+    mesg{i}
     out.println(mesg{i});
   end
 
@@ -210,12 +285,14 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
     end
   end
 
+  num_results = length(results);
+
   % I have all the results now, so put them into the output objects 
   %TODO: split this loop and call shmResult() with a list of (jobid, datasize) pairs
   %      which returns when all data is read.
   if mode==3
     %res_arg = zeros(1,length(results));
-    for i=1:length(results)
+    for i=1:num_results
       [token, remain] = strtok(results(i), ':');
       [token, remain] = strtok(remain, ':');
       shmem_size = strtrim(token);
@@ -228,25 +305,33 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
     
 
     % Getting results...
-    for i=1:length(results)
+    for i=1:num_results
       R{i} = shmResult2mat(res_arg{i});
     end
 
-    for i=1:length(results)
+    for i=1:num_results
       D = deserialize(R{i});
       A(i) = D{1};
       B(i) = D{2};
     end
 
   else 
-    for i=1:length(results)
+    for i=1:num_results
       result_file = char(results(i));
       load(result_file);
       [token, remain] = strtok(result_file, '_');
       idx = remain(2:strfind(remain, '.')-1);
       idx = str2num(idx);
-      A(idx) = struct(ret1);
-      B(idx) = struct(ret2);
+      ret1
+      if parmode
+        for j=1:PPN
+          A(PPN*(idx-1)+j) = struct(ret1(j));
+          B(PPN*(idx-1)+j) = struct(ret2(j));
+        end
+      else 
+        A(idx) = struct(ret1);
+        B(idx) = struct(ret2);
+      end
       system(['rm ', result_file]);
     end
 

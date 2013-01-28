@@ -51,8 +51,16 @@ function mworker(my_hostname, rank)
       [token, remain] = strtok(arg_files, ',');
       split_file = strtrim(token)
       if(DEBUG); fprintf(2, ['split_file is ',  split_file, '\n']); end
-      sf = strfind(remain, ',')
+      sf = strfind(remain, ',');
       shared_file = strtrim(remain(sf+1:end))
+      sf = strfind(shared_file, ',')
+      if sf
+        shared_file = strtrim(shared_file(1:sf-1))
+        parmode = true
+      end  
+      
+      
+
 
       % If protocol is shmem/network, get the data:
       if strcmp(proto, 'NETWORK')
