@@ -10,11 +10,7 @@ class Master {
 
   public Master(){};
 
-  public TestClass[] SendJobsToWorkers(String method, TestClass[] T) throws Exception {
-
-    System.out.println("Remote method is " + method);
-
-    System.out.println("array length is " + Integer.toString(T.length));
+  public <T> T[] SendJobsToWorkers(String method, T[] Obj) throws Exception {
 
     /* Write to disk with FileOutputStream */
     FileOutputStream f_out;
@@ -22,10 +18,10 @@ class Master {
     /* Write object with ObjectOutputStream */
     ObjectOutputStream obj_out;
     
-    int numTasks = T.length; 
+    int numTasks = Obj.length; 
     String id, dataFilePath;
 
-    for ( int i=0; i<3; i= i+1 ) {
+    for ( int i=0; i<numTasks; i= i+1 ) {
 
       id = Integer.toString(i);
       dataFilePath = "/dev/shm/.jv_" + id + ".data";
@@ -33,7 +29,7 @@ class Master {
 
       /* Write object out to disk */
       obj_out = new ObjectOutputStream (f_out);
-      obj_out.writeObject ( T[i] );
+      obj_out.writeObject ( Obj[i] );
       
       String mesg = method + ",TMPFS," + id + "," + dataFilePath + ",";
       System.out.println("mesg is: " + mesg);
@@ -43,17 +39,53 @@ class Master {
 
     out.println("done");
 
-    String myin = in.readLine();
-    System.out.println ("Got string " + myin);
+    String fromMPI, strIdx;
+    int idx;
 
-    return T;
+
+    /* Wait for all the results */
+    int jobsAccountedFor = 0;
+    
+    while ( jobsAccountedFor < numTasks ) {
+
+      try {
+
+        fromMPI = in.readLine();
+      
+      }  catch (Exception e) {
+         continue;
+      }
+
+      System.out.println("fromMPI is:" + fromMPI);
+      if( fromMPI!= null && !fromMPI.isEmpty() ) {
+        jobsAccountedFor = jobsAccountedFor + 1;
+        System.out.println ("Got string " + fromMPI);
+
+        /* De-serialize the data file */
+        FileInputStream f_in = new FileInputStream (fromMPI);
+        ObjectInputStream obj_in = new ObjectInputStream (f_in);
+        Object obj = obj_in.readObject();
+        
+        /* Get job ID from filename */
+        String[] splits = fromMPI.split("_");
+        System.out.println("this is :" + splits[1].substring(0, splits[1].indexOf(".")));
+        strIdx = splits[1].substring(0, splits[1].indexOf("."));
+        idx = Integer.parseInt(strIdx);
+
+        Obj[idx] = (T)obj;
+
+      }
+
+    }
+
+    return Obj;
 
   }
 
 
   //public static void main(String[] args) throws Exception {
 
-  public void LaunchMaster() throws Exception {
+  public void Launch() throws Exception {
 
     String fromClient;
     sock = new Socket("localhost", 11112);
@@ -63,6 +95,13 @@ class Master {
     in = new BufferedReader(new InputStreamReader (sock.getInputStream()));
     out = new PrintWriter(sock.getOutputStream(), true);
     
+  }
+
+  public void Destroy() throws Exception {
+
+    out.println("kill");
+    sock.close(); 
+
   }
 
 }

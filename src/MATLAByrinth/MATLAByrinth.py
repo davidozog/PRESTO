@@ -13,7 +13,7 @@ import sysv_ipc
 import mmap
 import shmemUtils
 
-DEBUG = True
+DEBUG = False
 
 #MATLAB_BIN = '/usr/local/packages/MATLAB/R2011b/bin/matlab'
 MATLAB_BIN = os.environ['MATLAB'] + '/bin/matlab'
@@ -27,6 +27,9 @@ MASTER_PORT = 11112
 
 JQKEY = 37408
 RQKEY = 48963
+
+# Set to True if using "NETWORK" mode
+messageQueue = False
 
 def launch_matlab(queue, worker_dict):
   # Without GUI:
@@ -118,8 +121,9 @@ if (rank==0):
   t.start()
 
   master_shmem_initiailization()
-  rq = sysv_ipc.MessageQueue(RQKEY, sysv_ipc.IPC_CREX)
-  jq = sysv_ipc.MessageQueue(JQKEY, sysv_ipc.IPC_CREX)
+  if messageQueue:
+    rq = sysv_ipc.MessageQueue(RQKEY, sysv_ipc.IPC_CREX)
+    jq = sysv_ipc.MessageQueue(JQKEY, sysv_ipc.IPC_CREX)
 
   sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
   sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -127,6 +131,7 @@ if (rank==0):
   #sock.setblocking(0)  # Sets sockets to non-blocking
   sock.bind(('localhost', MASTER_PORT))
   sock.listen(1)
+  firstrun = True
 
   while True:
     try:  
@@ -135,13 +140,14 @@ if (rank==0):
       time.sleep(1)
     else: # got line
       if line == 'running':
-        while True:
-          try:
-            cnn, addr = sock.accept()
-            if(DEBUG):print '     Master Connection :', addr
-            break
-          except:
-            continue
+        if firstrun:
+          while True:
+            try:
+              cnn, addr = sock.accept()
+              if(DEBUG):print '     Master Connection :', addr
+              break
+            except:
+              continue
 
         # Get jobs from 'send_jobs_to_workers' call
         mesg = ''
@@ -154,27 +160,21 @@ if (rank==0):
           mesg = ''
           if mesg_q.qsize() > 0:
             mesg = mesg_q.get() + '\n'
-            print 'getting T mesg :' + mesg
             fromq = True
           else:
             mesg = cnn.recv(4096)
-            print "Got new message(s)"
             fromq = False
           # why is 'filter' here?  
           mesg_split = filter(None, mesg.split('\n'))
           if not fromq:
             for m in mesg_split:
-              print 'm is :' + m
-              print 'mesg is :' + mesg
               if len(m) > 0 and (m) != mesg and m is not None:
-                print ' *************** putting msg :' + m
                 mesg_q.put(m)
           if mesg_q.qsize > 0 and not fromq:
             mesg = mesg_q.get() + '\n'
-            print 'getting F mesg :' + mesg
           if (len(mesg) > 0):
             if(DEBUG):print '     master message is ' + mesg 
-            if mesg == 'done\n':
+            if mesg == 'done\n' or mesg == 'kill\n':
               break
             protocol = mesg.split(',')[1].strip()
             if protocol == 'NETWORK':
@@ -186,8 +186,6 @@ if (rank==0):
 
             if protocol == 'TMPFS':
               if(DEBUG):print 'TMPFS msg is ' + mesg.split(',')[3].strip()
-              print 'TMPFS msg is ' + mesg
-              print 'TMPFS msg is ' + mesg.split(',')[3].strip()
               tmpfs_file = open(mesg.split(',')[3].strip(), 'rb')
               mesg_dat = tmpfs_file.read()
               mesg = mesg.strip() + ':' + mesg_dat + '\n'
@@ -278,15 +276,24 @@ if (rank==0):
 
         if(DEBUG):print 'All workers have sent back results.'
 
-        cnn.close()
+        #cnn.close()
         #jq.remove()
 
         q.put('running')
 
-      if line == 'kill':
+        if interface == 'java':
+          firstrun = False
+
+      if mesg == 'kill\n':
         print 'kill signal'
+        cnn.close()
         kill = 1
-        rq.remove()
+        if protocol == 'NETWORK':
+          rq.remove()
+          jq.remove()
+        for i in range(1,size):
+          mpiComm.send(",", dest=i, tag=KILL_TAG)
+        
         break
 
 # WORKER CONTROL:
@@ -374,6 +381,7 @@ else:
         data = data.strip() + ':' + shm_data
 
       elif protocol == 'TMPFS':
+        if(DEBUG): print 'results file is' + data
         results_file = open(data.strip(), 'rb')
         idx = data.find('_')
         jobid = data[idx+1:data.find('.',idx+1)]
@@ -383,29 +391,27 @@ else:
       mpiComm.send(data, dest=0, tag=RESULTS_TAG)
 
       # See if the master has decided to die:
-      mpiComm.Iprobe(source=0, tag=KILL_TAG, status=worker_status)
-      if (worker_status.tag == KILL_TAG):
-        if(DEBUG):print 'KILL MESSAGE came from ' + str(worker_status.source)
-        kill = mpiComm.recv(source=worker_status.source, tag=worker_status.tag)
+      #mpiComm.Iprobe(source=0, tag=KILL_TAG, status=worker_status)
+      #if (worker_status.tag == KILL_TAG):
+      #  if(DEBUG):print 'KILL MESSAGE came from ' + str(worker_status.source)
+      #  kill = mpiComm.recv(source=worker_status.source, tag=worker_status.tag)
     elif (worker_status.tag == KILL_TAG):
       if protocol == 'NETWORK':
         semaphore.acquire()
         memory.unlink()
         mapfile.close()
+
+      conn.sendall("kill")
+      conn.close()
       break
 
 # MPI : once rank 0 Matlab is dead, kill the workers
 if(DEBUG):print 'kill is first ' + str(kill) + ' on rank ' + srank
 #mpiComm.bcast(kill, root=0, tag=KILL_TAG)
 if (rank==0):
-  jq.remove()
   sock.close()
   kill = 1
-  for i in range(1, size):
-    mpiComm.send(kill, dest=i, tag=KILL_TAG)
-if(DEBUG):print 'kill is THEN ' + str(kill) + ' on rank ' + srank
-if rank != 0:
-  s.close()
-  if(DEBUG):print 'killing ' + str(p.pid)
-  os.kill(p.pid, signal.SIGUSR1)
-
+#if rank != 0:
+#  s.close()
+#  if(DEBUG):print 'killing ' + str(p.pid)
+#  os.kill(p.pid, signal.SIGUSR1)

@@ -66,8 +66,15 @@ public class TestClass implements java.io.Serializable {
       TArrayIn[i] = new TestClass (i, i+numTasks);
     }
     
-    M.LaunchMaster();
+    M.Launch();
     TArrayOut = M.SendJobsToWorkers("TestKernel2", TArrayIn);
+
+    for (int i=0; i<numTasks; i++) {
+      System.out.println("Final Results #"+Integer.toString(i) +" are: " + 
+      Integer.toString(TArrayOut[i].a) + " " + Float.toString(TArrayOut[i].b));
+    }
+
+    M.Destroy();
     
   }
 

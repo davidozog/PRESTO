@@ -3,3 +3,4 @@ gmon.out
 *.pyc
 .nfs*
 worker*.log
+worker*.err

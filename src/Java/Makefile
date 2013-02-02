@@ -5,7 +5,7 @@ JC = javac
 .SUFFIXES: .java .class
 
 .java.class:
-	$(JC) $(JFLAGS) $*.java
+	$(JC) $(JFLAGS) $*.java #-Xlint:unchecked
 
 CLASSES = \
 	Master.java \

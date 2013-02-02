@@ -35,10 +35,11 @@ class Worker {
       try {
         fromClient = in.readLine();
       } catch (Exception e) {
+        System.out.println ("asdf");
         continue;
       }
 
-      if(fromClient != null && !fromClient.isEmpty()) {
+      if(fromClient != null && !fromClient.isEmpty() && !fromClient.equals("kill")) {
         System.out.println ("Got string: " + fromClient);
 
         String[] splits = fromClient.split(",");
@@ -93,8 +94,6 @@ class Worker {
 
         } 
 
-        System.out.println("Out alive");
-
         TestClass T = (TestClass)new_obj;
         
         String r1 = Integer.toString(T.a);
@@ -102,24 +101,31 @@ class Worker {
 
         System.out.println("results: " + r1 + ", " + r2);
 
+        /* Now write results back into memory */
+        FileOutputStream f_out;
+        ObjectOutputStream obj_out;
+        String id, dataFilePath;
+        id = splits[2];
+        dataFilePath = "/dev/shm/.jr_" + id + ".data";
+        f_out = new FileOutputStream(dataFilePath);
+        obj_out = new ObjectOutputStream (f_out);
+        obj_out.writeObject ( new_obj );
+
+        out.println(dataFilePath);
+
+        System.out.println("Out alive");
+
+
+      }
+
+      else {
+        System.out.println ("Received kill signal");
+        sock.close();
+        break;
       }
       
     }
     
-
-//        for ( int i=0; i<3; i= i+1 ) {
-//        
-//            out.println("Rinth_testfunc, TMPFS, " + Integer.toString(i) + ", /dev/shm/.jd_7.mat,");
-//        
-//        }
-//
-//        out.println("done");
-//
-//        String myin = in.readLine();
-//
-//        System.out.println ("Got string " + myin);
-
-
   }
 }
 
