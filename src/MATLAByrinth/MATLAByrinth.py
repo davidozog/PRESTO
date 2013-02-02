@@ -296,8 +296,10 @@ else:
   #args = [MATLAB_BIN, '-nodesktop', '-nosplash', '-r', 'mworker(\''+name+'\', '+srank+')']  
   #p = subprocess.Popen(args, stdout=subprocess.PIPE)
 
-  #cmd = MATLAB_BIN + ' -nosplash -r "mworker(\''+name+'\', '+srank+')" -nodesktop'
-  cmd = "java Worker " + name + " " + srank
+  if interface == 'matlab':
+    cmd = MATLAB_BIN + ' -nosplash -r "mworker(\''+name+'\', '+srank+')" -nodesktop'
+  elif interface == 'java':
+    cmd = "java Worker " + name + " " + srank
   if(DEBUG):print "cmd is: " + cmd
   p = subprocess.Popen(cmd, stdout=open('worker'+srank+'.log', 'w'), stderr=open('worker'+srank+'.err', 'w'), shell=True)
 
