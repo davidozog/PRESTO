@@ -58,8 +58,6 @@ function mworker(my_hostname, rank)
         shared_file = strtrim(shared_file(1:sf-1))
         parmode = true
       end  
-      
-      
 
 
       % If protocol is shmem/network, get the data:

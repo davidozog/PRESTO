@@ -40,6 +40,14 @@ def launch_matlab(queue, worker_dict):
   # send kill signal to all workers
   q.put('kill')
 
+def launch_java(queue, worker_dict, java_app):
+  p = subprocess.Popen('java ' + java_app, shell=True)
+  queue.put('running')
+  p.communicate()
+  # send kill signal to all workers
+  q.put('kill')
+
+
 def master_shmem_initiailization():
   #try:
   #  semaphore = posix_ipc.Semaphore('MATSEM')
@@ -81,8 +89,10 @@ size = mpiComm.Get_size()
 rank = mpiComm.Get_rank()
 name = MPI.Get_processor_name()
 srank = str(rank)
+interface = sys.argv[1]
 
 print "Process %d of %d launched on %s." % (rank, size-1, name)
+
 
 # MASTER PROCESS:
 if (rank==0):
@@ -100,7 +110,11 @@ if (rank==0):
   worker_dict = worker_dict + '})'
 
   q = Queue()
-  t = threading.Thread(target=launch_matlab, args=(q, worker_dict))
+  if interface == 'matlab':
+    t = threading.Thread(target=launch_matlab, args=(q, worker_dict))
+  elif interface == 'java':
+    java_app = sys.argv[2]
+    t = threading.Thread(target=launch_java, args=(q, worker_dict, java_app))
   t.start()
 
   master_shmem_initiailization()
@@ -280,8 +294,11 @@ else:
   data = {'name': name, 'rank': rank}
   mpiComm.send(data, dest=0, tag=CHECKIN_TAG)
   #args = [MATLAB_BIN, '-nodesktop', '-nosplash', '-r', 'mworker(\''+name+'\', '+srank+')']  
-  cmd = MATLAB_BIN + ' -nosplash -r "mworker(\''+name+'\', '+srank+')" -nodesktop'
   #p = subprocess.Popen(args, stdout=subprocess.PIPE)
+
+  #cmd = MATLAB_BIN + ' -nosplash -r "mworker(\''+name+'\', '+srank+')" -nodesktop'
+  cmd = "java Worker " + name + " " + srank
+  if(DEBUG):print "cmd is: " + cmd
   p = subprocess.Popen(cmd, stdout=open('worker'+srank+'.log', 'w'), stderr=open('worker'+srank+'.err', 'w'), shell=True)
 
   # Wait for "alive" message from each workers
