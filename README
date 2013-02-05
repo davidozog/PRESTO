@@ -1,6 +1,10 @@
-MATLAByrinth
-============
-A distributed Master/Worker framework for Matlab
+PESTO: Parallel Execution System for Task Operation
+===================================================
+Pesto is a distributed framework that supports various parallel
+computation models (e.g. master/worker, pipeline, graph-based,
+mapreduce, etc.) with various programming adaptors (Matlab,
+Java, C++, etc.)  Currently, this repository include code that
+supports the master/worker model with Matlab or Java adaptors.
 
 
 INSTALLATION
@@ -8,24 +12,24 @@ INSTALLATION
 Please read the INSTALL file.
 
 
-USING MATLAByrinth
-==================
+USING PESTO
+===========
 After installing, you can use the following command to count the number
 of available generic compute nodes on Aciss:
 
-  launch_interactive_qsub count
+  interactive_job count
 
-Then you can launch MATLAByrinth with some number of MATLAB instances less than
+Then you can launch PESTO with some number of MATLAB instances less than
 the number printed above.  For example, if 4 or more compute nodes are 
 available, then you can issue the following command to launch an interactive
 session in the resource queue with 4 processes:
 
-  launch_interactive_qsub 4
+  interactive_job 4
 
-Then you must launch MATLAByrinth itself with 1 master process and 3 worker 
+Then you must launch PESTO itself with 1 master process and 3 worker 
 processes.  This is done by running the following command:
 
-  launch_interactive_Rinth 4
+  pesto 4
 
 This will launch a single interactive Matlab environment on the current node, 
 and 3 other Matlabs running in the background on the other 3 compute nodes.
@@ -35,18 +39,18 @@ the workers, and another .mat file with objects to be shared among the workers.
 
 In the case of Stingray, this procedure is done in the following files:
 
-  <Stingray_root_dir>/branches/MATLAByrinth/ForwardTL_initStation.m
-  <Stingray_root_dir>/branches/MATLAByrinth/ForwardTL_initStation_sub.m
+  <Stingray_root_dir>/branches/PESTO/ForwardTL_initStation.m
+  <Stingray_root_dir>/branches/PESTO/ForwardTL_initStation_sub.m
 
 
 
-TESTING MATLAByrinth
-====================
+TESTING PESTO
+=============
 
 Besides running Stingray with the .m files above, you should be able to test 
 the installation with this simple example.  
 
-First, begin by launching MATLAByrinth as described above with 4 compute nodes.
+First, begin by launching PESTO as described above with 4 compute nodes.
 If the launch worked, you should see 3 lines confirming the 
 connection of the workers to the master process:
 
@@ -56,9 +60,9 @@ connection of the workers to the master process:
 
 If so, type the following Matlab commands into the interative session:
 
-  m = getenv('MATLABYRINTH');
-  load([m, '/src/MATLAByrinth/my_split.mat'])
-  load([m, '/src/MATLAByrinth/my_shared.mat'])
+  m = getenv('PESTO');
+  load([m, '/src/PESTO/my_split.mat'])
+  load([m, '/src/PESTO/my_shared.mat'])
   [x y] = send_jobs_to_workers('Rinth_testfunc', 'NETWORK', {'aStation', 'tlMisfit_sub'}, {'srModel'})
 
 When the quick computation is finished, the x.A0 object should contain:

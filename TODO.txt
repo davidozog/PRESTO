@@ -1,25 +1,8 @@
-* Eliminate debug information
+* Add a Stingray branch called PESTO
 
 * move to /scratch and send .mat as buffer
 
-* move to tmpfs    "  "      "   "
-
 * Get rid of evalin('caller', ...) calls on Master side
-
-* Change the mex files to use memcpy for assigning data
-
-* Send through shared memory and network
-  load my_split.mat
-  load my_shared.mat
-  dbstop in send_jobs_to_workers at 64
-  send_jobs_to_workers('Rinth_testfunc', 'NETWORK', {'split', {aStation, tlMisfit_sub}, 'shared', {srModel}})
-
-  Actually, I want this function to look like this:
-
-  send_jobs_to_workers('Rinth_testfunc', 'NETWORK', {'aStation', 'tlMisfit_sub'}, {'srModel'})
-
-  then I can probably get the variables from the caller workspace... right?
-  
 
 * varargout for remote function
 
@@ -27,19 +10,6 @@
   Somthing like this:
     >>> results_file = send_tasks_to_workers(
                    struct('func1': A, B, C), struct('func2', A, C, D))
-
-* Create a more elegant interface for data-decomposed parallelism:
-  Something like this:
-    >>> [result1 result2 ...] = send_jobs_to_workers('myfunc', 
-              {'split1_object', 'split2_object', ... }, 
-              {'shared1_object', 'shared2_object', ... }) 
-
-* clean shutdown
-  -> probably need to call a function like kill_all_workers
-
-* make the automatic size detection of the split structures robust
-
-* send data through the network
 
 * Make 'make_hosts_dirs' handle different Matlab versions
 

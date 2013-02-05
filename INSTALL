@@ -2,35 +2,37 @@ INSTALLATION
 ============
 
 1) If you are on the Aciss cluster, run the installation script:
-      ./install_aciss
+
+     ./install_aciss
 
 
 2) ENVIRONMENT SETUP:
 
-To set up the MATLABYRINTH environment variable in bash: 
-  export MATLABYRINTH=/home11/ozog/sand/MATLAByrinth
+  To set up the PESTO environment variable in bash: 
+    export PESTO=</path/to/your/pesto/directory/>
+  
+  Then add PESTO to your path:
+    export PATH=$PATH:$PESTO/bin
+  
+  If it does not already exist, create a Matlab startup file:
+    mkdir -p ~/Documents/MATLAB
+    vi ~/Documents/MATLAB/startup.m
+  
+  and append these lines to the startup.m file:
+    % PESTO:
+    if isempty( getenv( 'PESTO' ) ) 
+    	display('Please set the PESTO environment variable' );
+    else
+    	addpath( [getenv( 'PESTO' ) , 'src/matlab'] );
+    end
+  
+  Also, you will want to add run these commands when using MATLAByrinth on ACISS:
+    module purge
+    module load python/2.7.2 
+    module load numpy/1.6.1 
+    module load mpi-tor/openmpi-1.4.5_gcc-4.4.6 
+    module load matlab/r2011b
 
-Then add MATLAByrinth to your path:
-  export PATH=$PATH:$MATLABYRINTH/bin
 
-If it does not already exist, create a Matlab startup file:
-  mkdir -p ~/Documents/MATLAB
-  vi ~/Documents/MATLAB/startup.m
-
-and append these lines to the startup.m file:
-  % MATLABYRINTH:
-  if isempty( getenv( 'MATLABYRINTH' ) ) 
-  	display('Please set the MATLABYRINTH environment variable' );
-  else
-  	addpath( [getenv( 'MATLABYRINTH' ) , 'src/matlab'] );
-  end
-
-Also, you will want to add run these commands when using MATLAByrinth on ACISS:
-  module purge
-  module load python/2.7.2 
-  module load numpy/1.6.1 
-  module load mpi-tor/openmpi-1.4.5_gcc-4.4.6 
-  module load matlab/r2011b
-
-3) Refer to the MATLAByrinth README file to see how to test the installation.
+3) Refer to the PESTO README file to see how to test the installation.
 
