@@ -1,9 +1,9 @@
 PESTO: Parallel Execution System for Task Operation
 ===================================================
 Pesto is a distributed framework that supports various parallel
-computation models (e.g. master/worker, pipeline, graph-based,
-mapreduce, etc.) with various programming adaptors (Matlab,
-Java, C++, etc.)  Currently, this repository include code that
+computational models (e.g. master/worker, pipeline, graph-based,
+MapReduce, etc.) with various programming adaptors (Matlab, 
+Java, C++, etc.)  Currently, this repository includes code that
 supports the master/worker model with Matlab or Java adaptors.
 
 
