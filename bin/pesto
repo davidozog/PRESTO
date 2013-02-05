@@ -5,10 +5,8 @@ import subprocess
 import os
 
 if (len(sys.argv) < 3):
-  #exit('Please tell me the number of processes you want: "launch_interative_Rinth <num_workers+1>"')
   exit('Usage:  "launch_interative_Rinth   < num_workers+1 >   < java | matlab >   < Java_App_Name > "')
 
-print sys.argv[1]
 if sys.argv[2] == 'matlab':
   pyargs = sys.argv[2]
 elif sys.argv[2] == 'java':
@@ -19,4 +17,5 @@ subprocess.call('module purge', shell=True)
 subprocess.call('module load python matlab', shell=True)
 subprocess.call('module load mpi-tor/openmpi-1.4.5_gcc-4.4.6', shell=True)
 
-subprocess.call('mpiexec --mca btl_tcp_if_include eth0 -np ' + sys.argv[1] + ' python '+ os.environ['PESTO'] + '/src/PESTO/PESTO.py ' + pyargs , shell=True)
+subprocess.call('source /home11/ozog/usr/python/bin/activate; mpiexec --mca btl_tcp_if_include eth0 -np ' \
+            + sys.argv[1] + ' python '+ os.environ['PESTO'] + '/src/PESTO/PESTO.py ' + pyargs , shell=True)

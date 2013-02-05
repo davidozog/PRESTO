@@ -288,9 +288,10 @@ if (rank==0):
         print 'kill signal'
         cnn.close()
         kill = 1
-        if protocol == 'NETWORK':
-          rq.remove()
-          jq.remove()
+        if not firstrun:
+          if protocol == 'NETWORK':
+            rq.remove()
+            jq.remove()
         for i in range(1,size):
           mpiComm.send(",", dest=i, tag=KILL_TAG)
         
