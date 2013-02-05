@@ -1,13 +1,7 @@
 INSTALLATION
 ============
 
-1) PACKAGE INSTALLATION: 
-
-  If you are on the Aciss cluster, run the installation script:
-     ./install_aciss
-
-
-2) ENVIRONMENT SETUP:
+1) ENVIRONMENT SETUP:
 
   To set up the PESTO environment variable in bash: 
     export PESTO=</path/to/your/pesto/directory/>
@@ -27,14 +21,8 @@ INSTALLATION
     	addpath( [getenv( 'PESTO' ) , 'src/matlab'] );
     end
   
-  Also, you will want to add run these commands when using MATLAByrinth on ACISS:
-    module purge
-    module load python/2.7.2 
-    module load numpy/1.6.1 
-    module load mpi-tor/openmpi-1.4.5_gcc-4.4.6 
-    module load matlab/r2011b
 
-3) JAVA SETUP:
+2) JAVA SETUP:
 
   If you plan on using Java adaptors, then you will need to add the following
   to your CLASSPATH environment variable:
@@ -42,7 +30,7 @@ INSTALLATION
     export CLASSPATH=$CLASSPATH:$PESTO/src/Java
 
 
-4) TEST INSTALLATION: 
+3) TEST INSTALLATION: 
 
   Refer to the PESTO README file to see how to test the installation.
 
