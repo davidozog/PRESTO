@@ -14,39 +14,42 @@ Please read the INSTALL file.
 
 USING PESTO WITH MATLAB
 =======================
-After installing, you can use the following command to count the number
-of available generic compute nodes on the Aciss cluster:
+After installing, you can use the following command to count the 
+number of available generic compute nodes on the Aciss cluster:
 
   interactive_job count
 
 ( Note: if you are not using Aciss, then you may be able to
   customizez this script in $PESTO/bin/ for your PBS scheduler.)
 
-Then you can launch PESTO with some number of MATLAB instances less than
-the number printed above.  For example, if 4 or more compute nodes are 
-available, then you can issue the following command to launch an interactive
-session in the resource queue with 4 processes:
+Then you can launch PESTO with some number of MATLAB instances 
+less than the number printed above.  For example, if 4 or more 
+compute nodes are available, then you can issue the following 
+command to launch an interactive session in the resource queue 
+with 4 processes:
 
   interactive_job 4
 
-Then you must launch PESTO itself with 1 master process and 3 worker 
-processes.  This is done by running the following command to launch
-Matlab computational engines:
+Then you must launch PESTO itself with 1 master process and 3 
+worker processes.  This is done by running the following command 
+to launch Matlab computational engines:
 
   pesto 4 matlab
 
-This will launch a single interactive Matlab environment on the current node, 
-and 3 other Matlabs running in the background on the other 3 compute nodes.
+This will launch a single interactive Matlab environment on the 
+current node, and 3 other Matlabs running in the background on 
+the other 3 compute nodes.
 
-When using PESTO with Stingray, you need to use a special branch that allows
-workers to use the Matlab Parallel Computing Toolbox:
+When using PESTO with Stingray, you need to use a special branch 
+that allows workers to use the Matlab Parallel Computing Toolbox:
 
   export STINGRAY=$STINGRAY/branches/PESTO
 
 
 USING PESTO WITH JAVA
 ======================
-If are using Java computational engines, then do the following to launch PESTO:
+If are using Java computational engines, then do the following 
+to launch PESTO:
 
   pesto 4 java <JavaAppName>
 
@@ -55,26 +58,27 @@ where <JavaAppName> is the name of your Java application.
 
 TESTING PESTO
 =============
+Besides running Stingray with the .m files above, you should be 
+able to test the installation with this simple example.  
 
-Besides running Stingray with the .m files above, you should be able to test 
-the installation with this simple example.  
-
-First, begin by launching PESTO as described above with 4 compute nodes.
-If the launch worked, you should see 3 lines confirming the 
-connection of the workers to the master process:
+First, begin by launching PESTO as described above with 4 compute 
+nodes. If the launch worked, you should see 3 lines confirming 
+the connection of the workers to the master process:
 
   Worker connected:  ('192.168.1.22', 33466)
   Worker connected:  ('192.168.1.22', 33467)
   ...
 
-If so, type the following Matlab commands into the interative session:
+If so, type the following Matlab commands into the interative 
+session:
 
   m = getenv('PESTO');
   load([m, '/src/PESTO/my_split.mat'])
   load([m, '/src/PESTO/my_shared.mat'])
   [x y] = send_jobs_to_workers('Rinth_testfunc', 'TMPFS', {'aStation', 'tlMisfit_sub'}, {'srModel'})
 
-When the quick computation is finished, the x.A0 object should contain:
+When the quick computation is finished, the x.A0 object should 
+contain:
 
     >>  x.A0
 
@@ -97,67 +101,67 @@ When the quick computation is finished, the x.A0 object should contain:
 
 and the y object should contain:
 
->> y(1)
-
-ans = 
-
-        bvec: 31
-         res: 31
-         ptr: 31
-       ttime: 31
-       inode: 31
-    ray_minz: 31
-       niter: 31
-      icntTT: 31
-       zssqr: 31
-       wssqr: 31
-       sumsd: 31
-       nssqr: 31
-      nelsum: 31
-      nramat: 31
-
->> y(2)
-
-ans = 
-
-        bvec: 32
-         res: 32
-         ptr: 32
-       ttime: 32
-       inode: 32
-    ray_minz: 32
-       niter: 32
-      icntTT: 32
-       zssqr: 32
-       wssqr: 32
-       sumsd: 32
-       nssqr: 32
-      nelsum: 32
-      nramat: 32
-
->> y(3)
-
-ans = 
-
-        bvec: 33
-         res: 33
-         ptr: 33
-       ttime: 33
-       inode: 33
-    ray_minz: 33
-       niter: 33
-      icntTT: 33
-       zssqr: 33
-       wssqr: 33
-       sumsd: 33
-       nssqr: 33
-      nelsum: 33
-      nramat: 33
+    >> y(1)
+    
+    ans = 
+    
+            bvec: 31
+             res: 31
+             ptr: 31
+           ttime: 31
+           inode: 31
+        ray_minz: 31
+           niter: 31
+          icntTT: 31
+           zssqr: 31
+           wssqr: 31
+           sumsd: 31
+           nssqr: 31
+          nelsum: 31
+          nramat: 31
+    
+    >> y(2)
+    
+    ans = 
+    
+            bvec: 32
+             res: 32
+             ptr: 32
+           ttime: 32
+           inode: 32
+        ray_minz: 32
+           niter: 32
+          icntTT: 32
+           zssqr: 32
+           wssqr: 32
+           sumsd: 32
+           nssqr: 32
+          nelsum: 32
+          nramat: 32
+    
+    >> y(3)
+    
+    ans = 
+    
+            bvec: 33
+             res: 33
+             ptr: 33
+           ttime: 33
+           inode: 33
+        ray_minz: 33
+           niter: 33
+          icntTT: 33
+           zssqr: 33
+           wssqr: 33
+           sumsd: 33
+           nssqr: 33
+          nelsum: 33
+          nramat: 33
 
 
 To safely shutdown PESTO, type the following commands:
 
->> kill_workers
-
->> exit
+    >> kill_workers
+    
+    >> exit
 
