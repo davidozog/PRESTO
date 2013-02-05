@@ -19,4 +19,4 @@ subprocess.call('module purge', shell=True)
 subprocess.call('module load python matlab', shell=True)
 subprocess.call('module load mpi-tor/openmpi-1.4.5_gcc-4.4.6', shell=True)
 
-subprocess.call('mpiexec --mca btl_tcp_if_include eth0 -np ' + sys.argv[1] + ' python '+ os.environ['MATLABYRINTH'] + '/src/MATLAByrinth/MATLAByrinth.py ' + pyargs , shell=True)
+subprocess.call('mpiexec --mca btl_tcp_if_include eth0 -np ' + sys.argv[1] + ' python '+ os.environ['PESTO'] + '/src/PESTO/PESTO.py ' + pyargs , shell=True)

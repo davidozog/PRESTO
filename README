@@ -12,12 +12,15 @@ INSTALLATION
 Please read the INSTALL file.
 
 
-USING PESTO
-===========
+USING PESTO WITH MATLAB
+=======================
 After installing, you can use the following command to count the number
-of available generic compute nodes on Aciss:
+of available generic compute nodes on the Aciss cluster:
 
   interactive_job count
+
+( Note: if you are not using Aciss, then you may be able to
+  customizez this script in $PESTO/bin/ for your PBS scheduler.)
 
 Then you can launch PESTO with some number of MATLAB instances less than
 the number printed above.  For example, if 4 or more compute nodes are 
@@ -27,21 +30,27 @@ session in the resource queue with 4 processes:
   interactive_job 4
 
 Then you must launch PESTO itself with 1 master process and 3 worker 
-processes.  This is done by running the following command:
+processes.  This is done by running the following command to launch
+Matlab computational engines:
 
-  pesto 4
+  pesto 4 matlab
 
 This will launch a single interactive Matlab environment on the current node, 
 and 3 other Matlabs running in the background on the other 3 compute nodes.
 
-To send a job to the workers, save a .mat file with objects to be split between
-the workers, and another .mat file with objects to be shared among the workers.
+When using PESTO with Stingray, you need to use a special branch that allows
+workers to use the Matlab Parallel Computing Toolbox:
 
-In the case of Stingray, this procedure is done in the following files:
+  export STINGRAY=$STINGRAY/branches/PESTO
 
-  <Stingray_root_dir>/branches/PESTO/ForwardTL_initStation.m
-  <Stingray_root_dir>/branches/PESTO/ForwardTL_initStation_sub.m
 
+USING PESTO WITH JAVA
+======================
+If are using Java computational engines, then do the following to launch PESTO:
+
+  pesto 4 java <JavaAppName>
+
+where <JavaAppName> is the name of your Java application.
 
 
 TESTING PESTO
@@ -63,7 +72,7 @@ If so, type the following Matlab commands into the interative session:
   m = getenv('PESTO');
   load([m, '/src/PESTO/my_split.mat'])
   load([m, '/src/PESTO/my_shared.mat'])
-  [x y] = send_jobs_to_workers('Rinth_testfunc', 'NETWORK', {'aStation', 'tlMisfit_sub'}, {'srModel'})
+  [x y] = send_jobs_to_workers('Rinth_testfunc', 'TMPFS', {'aStation', 'tlMisfit_sub'}, {'srModel'})
 
 When the quick computation is finished, the x.A0 object should contain:
 
@@ -144,4 +153,11 @@ ans =
        nssqr: 33
       nelsum: 33
       nramat: 33
+
+
+To safely shutdown PESTO, type the following commands:
+
+>> kill_workers
+
+>> exit
 

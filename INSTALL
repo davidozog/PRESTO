@@ -1,8 +1,9 @@
 INSTALLATION
 ============
 
-1) If you are on the Aciss cluster, run the installation script:
+1) PACKAGE INSTALLATION: 
 
+  If you are on the Aciss cluster, run the installation script:
      ./install_aciss
 
 
@@ -33,6 +34,15 @@ INSTALLATION
     module load mpi-tor/openmpi-1.4.5_gcc-4.4.6 
     module load matlab/r2011b
 
+3) JAVA SETUP:
 
-3) Refer to the PESTO README file to see how to test the installation.
+  If you plan on using Java adaptors, then you will need to add the following
+  to your CLASSPATH environment variable:
+
+    export CLASSPATH=$CLASSPATH:$PESTO/src/Java
+
+
+4) TEST INSTALLATION: 
+
+  Refer to the PESTO README file to see how to test the installation.
 

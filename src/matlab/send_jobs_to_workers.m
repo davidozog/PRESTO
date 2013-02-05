@@ -1,6 +1,6 @@
 function [A B] = send_jobs_to_workers(remote_method, varargin)
 
-  DEBUG = 1;
+  DEBUG = 0;
   PPN = 5;
 
   nVarargs = length(varargin);
@@ -45,14 +45,14 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
   end
 
   try
-    parvar = varargin{4}
+    parvar = varargin{4};
     if varargin{4}
-      parmode = true
+      parmode = true;
     else 
-      parmode = false
+      parmode = false;
     end
   catch
-    parmode = false
+    parmode = false;
   end
 
   % MODE 1:
@@ -169,7 +169,7 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
 
     % serialize a cell containing the split objects
     splitVarStr = '';
-    num_split_objects = length(varargin{2})
+    num_split_objects = length(varargin{2});
     for i=1:num_split_objects
       splitVarStr = [splitVarStr, varargin{2}{i}, ', '];
     end
@@ -177,7 +177,6 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
 
     % Get size of first variable and assume it's the number of jobs
     num_jobs = evalin('caller', ['length(', varargin{2}{1}, ')']);
-    if(DEBUG); fprintf(1, ['num_jobs is : ', num2str(num_jobs), '\n']); end
     if parmode
     
       if mod(num_jobs, PPN) == 0
@@ -185,6 +184,7 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
       else
         num_jobs = num_jobs/PPN + 1;
       end
+      display(['Total Number of Jobs: ', num2str(num_jobs)]);
 
         % Shared data:
         job_str_shared = '''';
@@ -204,7 +204,7 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
         jobid = int2str(i);
         fst = int2str((i-1)*PPN+1);
         lst = int2str((i-1)*PPN+PPN);
-        jobrng = [fst,':',lst]
+        jobrng = [fst,':',lst];
 
         for j=1:num_split_objects
           splitID = int2str(j);
@@ -221,6 +221,7 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
       end
 
     else
+      display(['Total Number of Jobs: ', num2str(num_jobs)]);
       for i=1:num_jobs
         job_str = '''';
         mesg{num_jobs} = '';
@@ -260,7 +261,7 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
   end
 
   for i=1:num_jobs
-    mesg{i}
+    mesg{i};
     out.println(mesg{i});
   end
 
@@ -328,7 +329,6 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
       [token, remain] = strtok(result_file, '_');
       idx = remain(2:strfind(remain, '.')-1);
       idx = str2num(idx);
-      ret1
       if parmode
         for j=1:PPN
           A(PPN*(idx-1)+j) = struct(ret1(j));

@@ -1,6 +1,6 @@
 function mworker(my_hostname, rank)
 
-  DEBUG = 1;
+  DEBUG = 0;
 
   % Set up a custom directory for the PCT
   %hostname = getenv('HOSTNAME');

@@ -13,7 +13,7 @@ import sysv_ipc
 import mmap
 import shmemUtils
 
-DEBUG = True
+DEBUG = False
 
 #MATLAB_BIN = '/usr/local/packages/MATLAB/R2011b/bin/matlab'
 MATLAB_BIN = os.environ['MATLAB'] + '/bin/matlab'
@@ -201,17 +201,15 @@ if (rank==0):
             # If all workers are busy wait for a result and 
             # send new job to that worker.
             if len(running_jobs) == size-1:
-              #TODO: this could be a function:
-              if(DEBUG):
-                print running_jobs 
-                print '     master waiting for a free worker...'
+              print str(len(running_jobs)) + ' JOBS ARE RUNNING'
+              if(DEBUG): 
+                print 'master waiting for a free worker...'
 
               data = mpiComm.recv(source=MPI.ANY_SOURCE, \
                                   tag=RESULTS_TAG,       \
                                   status=master_status)
 
-              #if(DEBUG):print '     GOT extra RESULT:' + data
-              if(DEBUG):print '     GOT extra RESULT:' 
+              if(DEBUG):print 'GOT EXTRA RESULT:' 
 
               running_jobs.remove(master_status.source)
 
@@ -228,7 +226,7 @@ if (rank==0):
               elif protocol == 'TMPFS':
                 TMPFS_PATH = '/dev/shm/'
                 jobid = data[:data.find(':')]
-                print 'JOBID: ' + jobid
+                print '   JOBID: ' + jobid + ' FINISHED'
                 results_file = open(TMPFS_PATH + '.results_' + jobid + '.mat', 'wb')
                 results_file.write(data[data.find(':')+1:])
                 results_file.close()
@@ -248,10 +246,10 @@ if (rank==0):
 
         # Wait for job completion 
         while len(running_jobs) > 0:
-          #TODO: this could be a function
-          if(DEBUG):print running_jobs; print '     master waiting for results...'
+          print str(len(running_jobs)) + ' JOBS ARE RUNNING'
+          if(DEBUG): print 'master waiting for results...'
           data = mpiComm.recv(source=MPI.ANY_SOURCE, tag=RESULTS_TAG, status=master_status)
-          #if(DEBUG):print 'GOT RESULT:' + data
+          if(DEBUG):print 'GOT RESULT:' + data
           running_jobs.remove(master_status.source)
           master_status = MPI.Status()
 
@@ -267,7 +265,7 @@ if (rank==0):
           elif protocol == 'TMPFS':
             TMPFS_PATH = '/dev/shm/'
             jobid = data[:data.find(':')]
-            print 'JOBID: ' + jobid
+            print '   JOBID: ' + jobid + ' FINISHED'
             results_file = open(TMPFS_PATH + '.results_' + jobid + '.mat', 'wb')
             results_file.write(data[data.find(':')+1:])
             results_file.close()
@@ -418,6 +416,7 @@ if(DEBUG):print 'kill is first ' + str(kill) + ' on rank ' + srank
 if (rank==0):
   sock.close()
   kill = 1
+  print 'You may now safely exit'
 #if rank != 0:
 #  s.close()
 #  if(DEBUG):print 'killing ' + str(p.pid)

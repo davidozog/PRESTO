@@ -1,11 +1,9 @@
-function [A0_sub tlMisfit_sub] = Rinth_testfunc(aStation, tlMisfit_sub, srModel, shared2)
+function [A0_sub tlMisfit_sub] = Rinth_testfunc(aStation, tlMisfit_sub, srModel)
 %function [A0_sub tlMisfit_sub] = Rinth_testfunc(split_filepath, shared_filepath)
 %  load(split_filepath)
 %  load(shared_filepath)
   fprintf(2, horzcat('hi from matlab - aStation is ', char(aStation), ' \n'))
 
-  shared2
-  
   station = str2num(char(aStation));
   A0_sub.A0 = [station station; station station] + srModel;
   tlMisfit_sub.bvec = [station];

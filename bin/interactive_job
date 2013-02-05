@@ -26,8 +26,8 @@ if count:
   print len(out)
   sys.exit()
 elif init:
-  print 'Initiating MATLAByrinth speed test'
-  rinth_path = os.environ['MATLABYRINTH'] + 'examples/init_test/'
+  print 'Initiating PESTO speed test'
+  rinth_path = os.environ['PESTO'] + 'examples/init_test/'
   qsub_command = 'qsub -q generic ' + rinth_path + \
                  'init_test.sh -d $PWD -l walltime=24:00:00 -l nodes='
 else:	
