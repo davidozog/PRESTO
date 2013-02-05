@@ -164,6 +164,7 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
   % MODE 4:
   if mode==4
     yrinth_str = 'm_a_t_l_a_b__y_r_i_n_t_h_';
+    yrinth_str_shared = 'm_a_t_l_a_b__y_r_i_n_t_h_sh_';
     TMPFS_PATH = '/dev/shm/';
 
     % serialize a cell containing the split objects
@@ -185,8 +186,19 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
         num_jobs = num_jobs/PPN + 1;
       end
 
-      for i = 1:num_jobs
+        % Shared data:
+        job_str_shared = '''';
+        num_shared_objs = length(varargin{3});
+        for k=1:num_shared_objs
+          splitID = int2str(k);
+          evalin('caller', [yrinth_str_shared,splitID,'=', varargin{3}{k}, ';']);
+          job_str_shared = [job_str_shared, yrinth_str_shared, splitID, ''', '''];
+        end
+        job_str_shared = job_str_shared(1:end-3);
+        save_str = ['''', TMPFS_PATH, '.jshared.mat'', ', job_str_shared];
+        evalin('caller', ['save(', save_str , ')']);
 
+      for i = 1:num_jobs
         job_str = '''';
         mesg{num_jobs} = '';
         jobid = int2str(i);
@@ -199,19 +211,13 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
           job_str = [job_str, yrinth_str, splitID, ''', '''];
           evalin('caller', [yrinth_str,splitID,'=', varargin{2}{j},'(',jobrng,');']);
         end
-        for k=1:length(varargin{3})
-          splitID = int2str(k+j);
-          evalin('caller', [yrinth_str,splitID,'=', varargin{3}{k}, ';']);
-          job_str = [job_str, yrinth_str, splitID, ''', '''];
-        end
         job_str = job_str(1:end-3);
 
         save_str = ['''', TMPFS_PATH, '.jd_', jobid, '.mat'', ', job_str];
         evalin('caller', ['save(', save_str , ')']);
 
         mesg{i} = [remote_method, ', ', varargin{1}, ', ', jobid, ...
-                          ', ', TMPFS_PATH, '.jd_', jobid, '.mat, P'];
-
+                          ', ', TMPFS_PATH, '.jd_', jobid, '.mat, ', int2str(num_shared_objs)];
       end
 
     else

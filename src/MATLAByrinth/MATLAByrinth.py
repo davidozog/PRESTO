@@ -13,7 +13,7 @@ import sysv_ipc
 import mmap
 import shmemUtils
 
-DEBUG = False
+DEBUG = True
 
 #MATLAB_BIN = '/usr/local/packages/MATLAB/R2011b/bin/matlab'
 MATLAB_BIN = os.environ['MATLAB'] + '/bin/matlab'
@@ -188,7 +188,9 @@ if (rank==0):
               if(DEBUG):print 'TMPFS msg is ' + mesg.split(',')[3].strip()
               tmpfs_file = open(mesg.split(',')[3].strip(), 'rb')
               mesg_dat = tmpfs_file.read()
-              mesg = mesg.strip() + ':' + mesg_dat + '\n'
+              tmpfs_file_shared = open('/dev/shm/.jshared.mat', 'rb')
+              mesg_dat_shared = tmpfs_file_shared.read()
+              mesg = mesg.strip() + ':::::' + mesg_dat + ':::::' + mesg_dat_shared + '\n'
                 
 
             # Determine the rank of the next worker:
@@ -347,8 +349,13 @@ else:
 
       elif protocol == 'TMPFS':
         worker_tmpfs_file = open(mesg.split(',')[3].strip(), 'wb')
-        worker_tmpfs_file.write(mesg[mesg.find(':')+1:])
+        mesg_data_split = mesg.split(':::::')
+        #worker_tmpfs_file.write(mesg[mesg.find(':')+1:])
+        worker_tmpfs_file.write(mesg_data_split[1])
         worker_tmpfs_file.close()
+        worker_tmpfs_file_shared = open('/dev/shm/.jshared.mat', 'wb')
+        worker_tmpfs_file_shared.write(mesg_data_split[2])
+        worker_tmpfs_file_shared.close()
         mesg = mesg.split(':')[0]
         mesg = mesg + '\n'
         conn.sendall(mesg)

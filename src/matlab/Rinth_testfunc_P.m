@@ -1,9 +1,11 @@
-%function [A0_sub tlMisfit_sub] = Rinth_testfunc(aStation, srModel)
-function [A0_sub tlMisfit_sub] = Rinth_testfunc_NFS(split_filepath, shared_filepath)
-  load(split_filepath)
-  load(shared_filepath)
-  fprintf(2, horzcat('hi from matlab - shared_filepath is ', shared_filepath, ' \n'))
+function [A0_sub tlMisfit_sub] = Rinth_testfunc_P(aStation, tlMisfit_sub, srModel, shared2)
+%function [A0_sub tlMisfit_sub] = Rinth_testfunc(split_filepath, shared_filepath)
+%  load(split_filepath)
+%  load(shared_filepath)
+  fprintf(2, horzcat('hi Dave... \n'))
+  %fprintf(2, horzcat('hi from matlab - aStation is ', char(aStation), ' \n'))
 
+  shared2
   aStation 
   aStation(1)
   aStation(1:5)
@@ -13,10 +15,9 @@ function [A0_sub tlMisfit_sub] = Rinth_testfunc_NFS(split_filepath, shared_filep
   srModel = srModel;
   myStations = aStation
   
-  matlabpool open
   parfor i=1:5
 
-    station = str2num(char(myStations(i)))
+    station = str2num(char(myStations(i)));
     A0_sub(i).A0 = [station station; station station] + srModel;
     tlMisfit_sub(i).bvec = [station];
     tlMisfit_sub(i).res = [station];
@@ -34,4 +35,3 @@ function [A0_sub tlMisfit_sub] = Rinth_testfunc_NFS(split_filepath, shared_filep
     tlMisfit_sub(i).nramat = station;
 
   end
-  matlabpool close

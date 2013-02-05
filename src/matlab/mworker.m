@@ -1,6 +1,6 @@
 function mworker(my_hostname, rank)
 
-  DEBUG = 0;
+  DEBUG = 1;
 
   % Set up a custom directory for the PCT
   %hostname = getenv('HOSTNAME');
@@ -25,6 +25,8 @@ function mworker(my_hostname, rank)
   mesg = 'alive';
   out.println(mesg);
 
+  matlabpool open
+
     run = 1;
     while run
 
@@ -35,6 +37,15 @@ function mworker(my_hostname, rank)
       end
       fromClient = char(fromClient);
       if(DEBUG); fprintf(2, horzcat('Worker:(received): ', fromClient, '\n')); end
+
+      try
+        if fromClient(1:4) == 'kill'
+          fprintf(2, horzcat('Time to die!\n'));
+          break;
+        end
+      catch
+        continue
+      end
 
       % Parse the function name and the input filenames:
       if(DEBUG); fprintf(2, ['fromClient is ',  fromClient, '\n']); end
@@ -51,6 +62,8 @@ function mworker(my_hostname, rank)
       [token, remain] = strtok(arg_files, ',');
       split_file = strtrim(token)
       if(DEBUG); fprintf(2, ['split_file is ',  split_file, '\n']); end
+      tmpfs_shared_file = '/dev/shm/.jshared.mat';
+      if(DEBUG); fprintf(2, ['shared_file is ',  tmpfs_shared_file, '\n']); end
       sf = strfind(remain, ',');
       shared_file = strtrim(remain(sf+1:end))
       sf = strfind(shared_file, ',')
@@ -93,9 +106,14 @@ function mworker(my_hostname, rank)
       elseif strcmp(proto, 'TMPFS')
         TMPFS_PATH = '/dev/shm/';
         yrinth_str = 'm_a_t_l_a_b__y_r_i_n_t_h_';
+        yrinth_str_shared = 'm_a_t_l_a_b__y_r_i_n_t_h_sh_';
         evalin('base', ['clear; load(''',split_file,''')']);
         evalin('base', 'W = whos');
+        %  I think there's a bug here.  Need a good way to get the number of args:
         num_objs = evalin('base', 'length(W)');
+        evalin('base', ['load(''',tmpfs_shared_file,''')']);
+        % This should be cleaned up:
+        num_objs_shared = str2num(shared_file);
         % Place objects in workspace:
         arg_str = '';
         for i = 1:num_objs
@@ -105,8 +123,14 @@ function mworker(my_hostname, rank)
             arg_str = [arg_str, ', ', yrinth_str, num2str(i)];
           end
         end
+        for i = 1:num_objs_shared
+            arg_str = [arg_str, ', ', yrinth_str_shared, num2str(i)];
+        end
         arg_str
+        function_name
+      if(DEBUG); fprintf(2, horzcat('Entering...\n')); end
         [ret1 ret2] = evalin('base', [function_name, '(', arg_str, ')']); 
+      if(DEBUG); fprintf(2, horzcat('Leaving\n')); end
 
         % write results to file and pass path to master
         results_file = [TMPFS_PATH, '.results_', jobid, '.mat'];
@@ -129,3 +153,5 @@ function mworker(my_hostname, rank)
       end
 
     end
+
+    matlabpool close
