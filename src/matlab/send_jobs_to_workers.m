@@ -3,6 +3,8 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
   DEBUG = 0;
   PPN = 5;
 
+  fprintf(1, ['nargout is ', int2str(nargout(remote_method)), '\n']);
+
   nVarargs = length(varargin);
 
   % Mode 1 :

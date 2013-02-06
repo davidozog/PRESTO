@@ -4,3 +4,4 @@ gmon.out
 .nfs*
 worker*.log
 worker*.err
+*.o
