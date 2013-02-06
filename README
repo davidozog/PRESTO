@@ -20,7 +20,7 @@ number of available generic compute nodes on the Aciss cluster:
   interactive_job count
 
 ( Note: if you are not using Aciss, then you may be able to
-  customizez this script in $PESTO/bin/ for your PBS scheduler.)
+  customize this script in $PESTO/bin/ for your PBS scheduler.)
 
 Then you can launch PESTO with some number of MATLAB instances 
 less than the number printed above.  For example, if 4 or more 
