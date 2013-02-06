@@ -250,7 +250,7 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
         evalin('caller', ['save(', save_str , ')']);
 
         mesg{i} = [remote_method, ', ', varargin{1}, ', ', jobid, ...
-                          ', ', TMPFS_PATH, '.jd_', jobid, '.mat,'];
+                          ', ', TMPFS_PATH, '.jd_', jobid, '.mat, ', int2str(num_shared_objs)];
       end
     end
   end
