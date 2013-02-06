@@ -186,17 +186,17 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
       end
       display(['Total Number of Jobs: ', num2str(num_jobs)]);
 
-        % Shared data:
-        job_str_shared = '''';
-        num_shared_objs = length(varargin{3});
-        for k=1:num_shared_objs
-          splitID = int2str(k);
-          evalin('caller', [yrinth_str_shared,splitID,'=', varargin{3}{k}, ';']);
-          job_str_shared = [job_str_shared, yrinth_str_shared, splitID, ''', '''];
-        end
-        job_str_shared = job_str_shared(1:end-3);
-        save_str = ['''', TMPFS_PATH, '.jshared.mat'', ', job_str_shared];
-        evalin('caller', ['save(', save_str , ')']);
+      % Shared data:
+      job_str_shared = '''';
+      num_shared_objs = length(varargin{3});
+      for k=1:num_shared_objs
+        splitID = int2str(k);
+        evalin('caller', [yrinth_str_shared,splitID,'=', varargin{3}{k}, ';']);
+        job_str_shared = [job_str_shared, yrinth_str_shared, splitID, ''', '''];
+      end
+      job_str_shared = job_str_shared(1:end-3);
+      save_str = ['''', TMPFS_PATH, '.jshared.mat'', ', job_str_shared];
+      evalin('caller', ['save(', save_str , ')']);
 
       for i = 1:num_jobs
         job_str = '''';
@@ -222,6 +222,19 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
 
     else
       display(['Total Number of Jobs: ', num2str(num_jobs)]);
+
+      % Shared data:
+      job_str_shared = '''';
+      num_shared_objs = length(varargin{3});
+      for k=1:num_shared_objs
+        splitID = int2str(k);
+        evalin('caller', [yrinth_str_shared,splitID,'=', varargin{3}{k}, ';']);
+        job_str_shared = [job_str_shared, yrinth_str_shared, splitID, ''', '''];
+      end
+      job_str_shared = job_str_shared(1:end-3);
+      save_str = ['''', TMPFS_PATH, '.jshared.mat'', ', job_str_shared];
+      evalin('caller', ['save(', save_str , ')']);
+
       for i=1:num_jobs
         job_str = '''';
         mesg{num_jobs} = '';
@@ -230,11 +243,6 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
           splitID = int2str(j);
           job_str = [job_str, yrinth_str, splitID, ''', '''];
           evalin('caller', [yrinth_str,splitID,'=', varargin{2}{j},'(',jobid,');']);
-        end
-        for k=1:length(varargin{3})
-          splitID = int2str(k+j);
-          evalin('caller', [yrinth_str,splitID,'=', varargin{3}{k}, ';']);
-          job_str = [job_str, yrinth_str, splitID, ''', '''];
         end
         job_str = job_str(1:end-3);
 
