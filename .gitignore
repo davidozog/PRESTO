@@ -5,3 +5,6 @@ gmon.out
 worker*.log
 worker*.err
 *.o
+*.swp
+*.swo
+*src/PESTO/CPP/PESTO

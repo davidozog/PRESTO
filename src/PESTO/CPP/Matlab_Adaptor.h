@@ -13,7 +13,7 @@ class Matlab_Adaptor : public CE_Adaptor {
 
     Matlab_Adaptor();
     ~Matlab_Adaptor();
-    virtual void Launch_CE(char *);
+    virtual void Launch_CE(const char *, int);
     virtual char * get_name();
     virtual char * set_name();
 

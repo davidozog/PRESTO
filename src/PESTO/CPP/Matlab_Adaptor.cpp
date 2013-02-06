@@ -16,12 +16,14 @@ Matlab_Adaptor::Matlab_Adaptor(): CE_Adaptor(){
 Matlab_Adaptor::~Matlab_Adaptor(){
 
   // delete instance;
+  free(name);
 
 }
 
-void Matlab_Adaptor::Launch_CE(char *flags){
+void Matlab_Adaptor::Launch_CE(const char *flags, int background){
 
   FILE *fp;
+  int i;
   char line[130]; 
 
   char *mPath;
@@ -40,20 +42,21 @@ void Matlab_Adaptor::Launch_CE(char *flags){
     exit (-1);
   }
 
-  //fp = popen(mPath, "r");
-  int i;
-  if (system(NULL)) puts ("Ok");
-    else exit (EXIT_FAILURE);
-  printf ("Executing command Matlab...\n");
-  i=system (mPath);
-  printf ("The value returned was: %d.\n",i);
-
-  //while ( fgets( line, sizeof line, i)) {
-  //  //printf ("%s", line);
-  //  cout << line << flush;
-  //}
-
-  //pclose (fp);
+  if ( background ) {
+    fp = popen(mPath, "r");
+    while ( fgets( line, sizeof line, fp)) {
+      //printf ("%s", line);
+      fflush(fp);
+    }
+    pclose (fp);
+  }
+  else {
+    if (system(NULL)) puts ("Ok");
+      else exit (EXIT_FAILURE);
+    printf ("Executing command Matlab...\n");
+    i = system(mPath);
+    printf ("The value returned was: %d.\n",i);
+  }
 
 }
 

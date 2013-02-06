@@ -7,32 +7,35 @@
 using namespace std;
 
 
-Master_Worker_Model::Master_Worker_Model(CE_Adaptor *CE): Comp_Model() {
+Master_Worker_Model::Master_Worker_Model(CE_Adaptor *CE, char *hostnm, int namelen): Comp_Model() {
 
   char *ce_name;
   ce_name = CE->get_name();
 
   if ( strcmp(ce_name, "matlab") == 0 )  {
-    master_cmd = (char *)malloc(64);
-    worker_cmd = (char *)malloc(64);
-    master_cmd = (char *)"/bin/matlab -nodesktop -nosplash";
-    worker_cmd = (char *)"/bin/matlab -nodesktop -nosplash -r \"mworker(\'cn130\', 1)\"";
+    master_cmd = (const char *)malloc(128);
+    worker_cmd = (char *)malloc(128);
+    hostname  =  (const char *)malloc(namelen*sizeof(char)+1);
+    strncpy((char *)hostname, hostnm, sizeof(char)*(namelen+1));
+    master_cmd = "/bin/matlab -nodesktop -nosplash";
+    strcpy(worker_cmd, "/bin/matlab -nodesktop -nosplash -r \"mworker(\'");
+    strcat(worker_cmd, hostnm);
+    strcat((char *)worker_cmd, "\', 1)\" 2>&1 | tee mylog");
   }
 
-  //free(ce_name);
-  
 }
 
 
 Master_Worker_Model::~Master_Worker_Model(){
 
   // delete instance;
-  free(master_cmd);
-  free(worker_cmd);
+  free((void *)master_cmd);
+  free((void *)worker_cmd);
+  free((void *)hostname);
 
 }
 
-char * Master_Worker_Model::get_m_cmd(){
+const char * Master_Worker_Model::get_m_cmd(){
 
   return master_cmd;
   
@@ -41,6 +44,12 @@ char * Master_Worker_Model::get_m_cmd(){
 char * Master_Worker_Model::get_w_cmd(){
 
   return worker_cmd;
+  
+}
+
+const char * Master_Worker_Model::get_hostname(){
+
+  return hostname;
   
 }
 
