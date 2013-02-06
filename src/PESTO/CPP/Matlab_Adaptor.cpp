@@ -45,7 +45,6 @@ void Matlab_Adaptor::Launch_CE(char *flags){
   if (system(NULL)) puts ("Ok");
     else exit (EXIT_FAILURE);
   printf ("Executing command Matlab...\n");
-  setenv("STINGRAY","/home/dave/School/Stingray/trunk",1);
   i=system (mPath);
   printf ("The value returned was: %d.\n",i);
 
