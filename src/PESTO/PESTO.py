@@ -191,6 +191,8 @@ if (rank==0):
               tmpfs_file_shared = open('/dev/shm/.jshared.mat', 'rb')
               mesg_dat_shared = tmpfs_file_shared.read()
               mesg = mesg.strip() + ':::::' + mesg_dat + ':::::' + mesg_dat_shared + '\n'
+              tmpfs_file.close()
+              tmpfs_file_shared.close()
                 
 
             # Determine the rank of the next worker:
