@@ -24,8 +24,13 @@ void Matlab_Adaptor::Launch_CE(char *flags){
   FILE *fp;
   char line[130]; 
 
-  char * mPath;
+  char *mPath;
+  char *sPath;
+ // char *mEnv = "source ~/.zshrc; ";
+ // strcpy(mPath, mEnv);
+ // strcat(mPath, getenv("MATLAB"));
   mPath = getenv ("MATLAB");
+
   if (mPath!=NULL) {
     strcat (mPath, flags);
     printf ("MATLAB path is: %s\n",mPath);
@@ -35,13 +40,21 @@ void Matlab_Adaptor::Launch_CE(char *flags){
     exit (-1);
   }
 
-  fp = popen(mPath, "r");
+  //fp = popen(mPath, "r");
+  int i;
+  if (system(NULL)) puts ("Ok");
+    else exit (EXIT_FAILURE);
+  printf ("Executing command Matlab...\n");
+  setenv("STINGRAY","/home/dave/School/Stingray/trunk",1);
+  i=system (mPath);
+  printf ("The value returned was: %d.\n",i);
 
-  while ( fgets( line, sizeof line, fp)) {
-    printf ("%s", line);
-  }
+  //while ( fgets( line, sizeof line, i)) {
+  //  //printf ("%s", line);
+  //  cout << line << flush;
+  //}
 
-  pclose (fp);
+  //pclose (fp);
 
 }
 
