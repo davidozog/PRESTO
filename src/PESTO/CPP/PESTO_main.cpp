@@ -22,6 +22,7 @@ using namespace std;
 
 #define DEBUG 0
 #define MASTER_PORT 11112
+#define WORKER_PORT 11110
 #define RUNNING 1
 #define KILL    2
 
@@ -161,8 +162,7 @@ int main(int argc, char **argv) {
   MPI_Comm_rank (MPI_COMM_WORLD, &rank);  
   MPI_Comm_size (MPI_COMM_WORLD, &size);  
   MPI_Get_processor_name(hostname, &namelen);
-  cout << "my hostname is " << hostname << endl;
-
+  MPI_Status stat;
 
   /* if ( matlab && master_worker ) then: */
 
@@ -174,15 +174,19 @@ int main(int argc, char **argv) {
   memcpy(&pe->MW, &mw, sizeof(mw));
 
   pthread_t t1;
+  int sockfd, newsockfd, portno, n, optval, optlen;
+  int firstrun, destination; 
+  char *optval2;
+  socklen_t clilen;
+  struct sockaddr_in serv_addr, cli_addr;
+  vector<string> mesg_split;
+  string protocol;
+	char *split_buff, *shared_buff; 
+	unsigned long fileLen_split, fileLen_shared;
+
 
   if (rank==0) {
-    int sockfd, newsockfd, portno, n, optval, optlen;
-    int firstrun, destination; 
-    char *optval2;
-    socklen_t clilen;
-    char mesg[256];
-    struct sockaddr_in serv_addr, cli_addr;
-    string protocol;
+    char mesg[4096];
 
     /*  This is where I would gather hostnames and make the worker_dict
     for (i=0; i<size; i++) {
@@ -227,9 +231,9 @@ int main(int argc, char **argv) {
 
     while ( strncmp(mesg,"kill", 4) != 0 ) {
 
-      bzero(mesg,256);
-      n = read(newsockfd,mesg,255);
-      if (n < 0) error("ERROR reading from socket");
+      bzero(mesg,4096);
+      n = read(newsockfd, mesg, 4095);
+      if ( n < 0 ) error("ERROR reading from socket");
       if ( n > 0 ) {
         printf("       master message is: %s\n",mesg);
         if ( strncmp(mesg,"done", 4) == 0 || strncmp(mesg,"kill", 4) == 0 ) {
@@ -239,7 +243,7 @@ int main(int argc, char **argv) {
         
         string message(mesg);
 
-        vector<string> mesg_split = split(message, ',');
+        mesg_split = split(message, ',');
         protocol = mesg_split[1];
         /* Clean the string */
         //protocol.erase(remove_if(protocol.begin(), protocol.end(), ::isspace), protocol.end());
@@ -253,8 +257,6 @@ int main(int argc, char **argv) {
           string tmpfs_file(trim(mesg_split[3]));
           cout << "tmpfs file is " << tmpfs_file << endl; 
 	        FILE *tmpfs_split_file, *tmpfs_shared_file;
-	        char *buffer; 
-	        unsigned long fileLen;
 
           /* Read data files */
           // I can't figure out how best to do this:
@@ -264,20 +266,20 @@ int main(int argc, char **argv) {
 	        
 	        //Get file length
 	        fseek(tmpfs_split_file, 0, SEEK_END);
-	        fileLen=ftell(tmpfs_split_file);
+	        fileLen_split = ftell(tmpfs_split_file);
 	        fseek(tmpfs_split_file, 0, SEEK_SET);
 
 	        //Allocate memory
-	        buffer=(char *)malloc(fileLen+1);
-	        if (!buffer) {
+	        split_buff = (char *)malloc(fileLen_split+1);
+	        if ( !split_buff ) {
             fclose(tmpfs_split_file);
             error ("Memory error!");
           }
 
 	        //Read file contents into buffer
-	        fread(buffer, fileLen, 1, tmpfs_split_file);
-          message.append(":::::");
-          message.append(buffer);
+	        fread(split_buff, fileLen_split, 1, tmpfs_split_file);
+          //message.append("\n");
+          //message.append(split_buff);
           fclose(tmpfs_split_file);
 
 
@@ -287,27 +289,26 @@ int main(int argc, char **argv) {
 	        
 	        //Get file length
 	        fseek(tmpfs_shared_file, 0, SEEK_END);
-	        fileLen=ftell(tmpfs_shared_file);
+	        fileLen_shared=ftell(tmpfs_shared_file);
 	        fseek(tmpfs_shared_file, 0, SEEK_SET);
 
 	        //Allocate memory
-	        buffer=(char *)realloc(buffer, fileLen+1);
-	        if (!buffer) {
+	        shared_buff = (char *)malloc(fileLen_shared+1);
+	        if (!shared_buff) {
             fclose(tmpfs_shared_file);
             error ("Memory error!");
           }
 
 	        //Read file contents into buffer
-	        fread(buffer, fileLen, 1, tmpfs_shared_file);
+	        fread(shared_buff, fileLen_shared, 1, tmpfs_shared_file);
 
-          message.append(":::::");
-          message.append(buffer);
+          //message.append("\n");
+          //message.append(buffer);
           fclose(tmpfs_shared_file);
 
           cout << "message is : " << message << endl;
           
         }
-
 
         /*  Determine the rank of the next worker  */
         if (destination != size-1)
@@ -349,8 +350,17 @@ int main(int argc, char **argv) {
           //master_status = MPI.Status();
         } 
         else {
+          // TODO: It would probably be best to make these non-blocking
           rc = MPI_Send((void *)message.c_str(), message.length()+1, MPI_CHAR, destination, DO_WORK_TAG, MPI_COMM_WORLD);
+          rc = MPI_Send(&fileLen_split, 1, MPI_INT, destination, DO_WORK_TAG, MPI_COMM_WORLD);
+          rc = MPI_Send((void *)split_buff, fileLen_split, MPI_CHAR, destination, DO_WORK_TAG, MPI_COMM_WORLD);
+          rc = MPI_Send(&fileLen_shared, 1, MPI_INT, destination, DO_WORK_TAG, MPI_COMM_WORLD);
+          rc = MPI_Send((void *)shared_buff, fileLen_shared, MPI_CHAR, destination, DO_WORK_TAG, MPI_COMM_WORLD);
           running_jobs.push_back(destination);
+
+          free(split_buff);
+          free(shared_buff);
+          
         }
       } else 
           continue; 
@@ -369,15 +379,132 @@ int main(int argc, char **argv) {
   }
 
   else {
+    char mesg[4096];
 
     pthread_create(&t1, NULL, &worker_thread, (void *)pe);
-    pthread_exit(NULL);
 
     /*  This is where I would send my worker hostname info to the master  */
     /* data = {'name': name, 'rank': rank}
        mpiComm.send(data, dest=0, tag=CHECKIN_TAG) */
 
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    optval = 1;
+    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval);
 
+    if (sockfd < 0) 
+      error("ERROR opening socket");
+    bzero((char *) &serv_addr, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_port = htons(WORKER_PORT);
+    if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
+      error("ERROR on binding");
+    listen(sockfd,5);
+    clilen = sizeof(cli_addr);
+
+    while(pe->status==0){
+      sleep(1);
+    }
+    if ( pe->status == RUNNING ) {
+      while (1) {
+        newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+        if (newsockfd < 0) 
+          error("ERROR on accept");
+        else {
+          cout << "Worker connected: " << cli_addr.sin_addr.s_addr << endl;
+          break;
+        }
+      }
+    }
+
+    bzero(mesg,4096);
+    n = read(newsockfd,mesg,4096);
+
+    string message(mesg);
+
+    cout << "mesg is " << message << endl;
+
+    while ( strncmp(mesg,"kill", 4) != 0 ) {
+
+      // TODO:  Maybe I could get message size first
+      rc = MPI_Recv(mesg, 4096, MPI_CHAR, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &stat);
+      rc = MPI_Recv(&fileLen_split, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &stat);
+      rc = MPI_Recv(split_buff, 4096, MPI_CHAR, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &stat);
+      rc = MPI_Recv(&fileLen_shared, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &stat);
+      rc = MPI_Recv(shared_buff, 4096, MPI_CHAR, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &stat);
+
+      message = mesg;
+
+      mesg_split = split(message, ',');
+      protocol = mesg_split[1];
+      protocol = trim(protocol);
+
+      if (stat.MPI_TAG == DO_WORK_TAG) {
+        cout << "GOT IT!" << endl;
+        cout << "protocol is " << protocol << endl;
+        if ( protocol == "NETWORK" ) {
+          /*  Later ...  */
+        }
+        else if ( protocol == "TMPFS" ) {
+          string tmpfs_file(trim(mesg_split[3]));
+	        FILE *tmpfs_split_file, *tmpfs_shared_file;
+	        char *buffer; 
+	        unsigned long fileLen;
+
+          /* Read data files */
+          // I can't figure out how best to do this:
+          //ReadFile(tmpfs_file.c_str(), buffer1);
+	        tmpfs_split_file = fopen(tmpfs_file.c_str(), "wb");
+	        if (!tmpfs_split_file) error("ERROR reading tmpfs file");
+	        
+	        //Get file length
+	        //fseek(tmpfs_split_file, 0, SEEK_END);
+	        //fileLen=ftell(tmpfs_split_file);
+	        //fseek(tmpfs_split_file, 0, SEEK_SET);
+
+          vector<string> mesg_data_split = split(message, '\n');
+          for (i=0; i<mesg_data_split.size(); i++) {
+            cout << "message["<< i << "] is :" << mesg_data_split[i] << endl;
+          }
+          fwrite((const void *)mesg_data_split[2].c_str(), sizeof(char), 
+                 mesg_data_split[2].length(), tmpfs_split_file);
+  
+
+	        //Allocate memory
+	        //buffer=(char *)malloc(fileLen+1);
+	        //if (!buffer) {
+          //  fclose(tmpfs_split_file);
+          //  error ("Memory error!");
+          //}
+
+	        //Read file contents into buffer
+	        //fread(buffer, fileLen, 1, tmpfs_split_file);
+          //message.append(":::::");
+          //message.append(buffer);
+          fclose(tmpfs_split_file);
+
+          cout << "Worker file written" << endl;
+
+/*
+          worker_tmpfs_file_shared = open('/dev/shm/.jshared.mat', 'wb')
+          worker_tmpfs_file_shared.write(mesg_data_split[2])
+          worker_tmpfs_file_shared.close()
+          mesg = mesg.split(':')[0]
+          mesg = mesg + '\n'
+          conn.sendall(mesg)
+*/
+        }
+        else {
+/*          //conn.sendall(mesg) */
+        }
+
+
+      }
+
+
+    }
+
+    pthread_exit(NULL);
 
   }
 
