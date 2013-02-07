@@ -20,7 +20,7 @@ Master_Worker_Model::Master_Worker_Model(CE_Adaptor *CE, char *hostnm, int namel
     master_cmd = "/bin/matlab -nodesktop -nosplash";
     strcpy(worker_cmd, "/bin/matlab -nodesktop -nosplash -r \"mworker(\'");
     strcat(worker_cmd, hostnm);
-    strcat((char *)worker_cmd, "\', 1)\" 2>&1 | tee mylog");
+    strcat((char *)worker_cmd, "\', 1)\" 2>&1 | tee /dev/shm/pesto_worker.log");
   }
 
 }

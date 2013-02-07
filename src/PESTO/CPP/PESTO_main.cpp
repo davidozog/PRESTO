@@ -12,12 +12,14 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <vector>
+#include <list>
 #include <string>
 #include <sstream>
 #include <algorithm> 
 #include <functional> 
 #include <cctype>
 #include <locale>
+#include <queue>
 using namespace std;
 
 #define DEBUG 0
@@ -174,67 +176,99 @@ int main(int argc, char **argv) {
   memcpy(&pe->MW, &mw, sizeof(mw));
 
   pthread_t t1;
-  int sockfd, newsockfd, portno, n, optval, optlen;
-  int firstrun, destination; 
+  int sockfd, newsockfd, portno, optval, optlen;
+  int n, firstrun, destination; 
   char *optval2;
   socklen_t clilen;
   struct sockaddr_in serv_addr, cli_addr;
   vector<string> mesg_split;
-  string protocol;
+  string protocol, jobid;
 	char *split_buff, *shared_buff; 
-	unsigned long fileLen_split, fileLen_shared;
+	int fileLen_split, fileLen_shared, fileLen;
+	char *buffer; 
 
 
   if (rank==0) {
-    char mesg[4096];
+   char mesg[4096];
+   int fromq;
+   string message;
+   n=0;
 
-    /*  This is where I would gather hostnames and make the worker_dict
-    for (i=0; i<size; i++) {
-      MPI_Recv(data, ...
+   /*  This is where I would gather hostnames and make the worker_dict
+   for (i=0; i<size; i++) {
+     MPI_Recv(data, ...
+   }
+   */
+
+   pthread_create(&t1, NULL, &master_thread, (void *)pe);
+
+   sockfd = socket(AF_INET, SOCK_STREAM, 0);
+   optval = 1;
+   setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval);
+
+   if (sockfd < 0) 
+     error("ERROR opening socket");
+   bzero((char *) &serv_addr, sizeof(serv_addr));
+   serv_addr.sin_family = AF_INET;
+   serv_addr.sin_addr.s_addr = INADDR_ANY;
+   serv_addr.sin_port = htons(MASTER_PORT);
+   if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
+     error("ERROR on binding");
+   listen(sockfd,5);
+   clilen = sizeof(cli_addr);
+
+   firstrun = 1; 
+   queue<string> task_q;
+   task_q.push("run");
+
+   while ( 1 ) {
+    if ( !task_q.empty() ) {
+      message = task_q.front();
+      task_q.pop();
     }
-    */
-
-    pthread_create(&t1, NULL, &master_thread, (void *)pe);
-
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    optval = 1;
-    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval);
-
-    if (sockfd < 0) 
-      error("ERROR opening socket");
-    bzero((char *) &serv_addr, sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = INADDR_ANY;
-    serv_addr.sin_port = htons(MASTER_PORT);
-    if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
-      error("ERROR on binding");
-    listen(sockfd,5);
-    clilen = sizeof(cli_addr);
-
-    firstrun = 1; 
-
-    while(pe->status==0){
-      sleep(1);
-    }
-    if ( pe->status == RUNNING && firstrun ) {
-      while (1) {
-        newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
-        if (newsockfd < 0) 
-          error("ERROR on accept");
-        else
-          break;
-      }
-    }
+    if ( message == "run" && firstrun ) 
+      newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+    if ( newsockfd < 0 )
+      error("ERROR on accept");
 
     destination = 0;
-    vector<int> running_jobs;
+    list<int> running_jobs;
 
     while ( strncmp(mesg,"kill", 4) != 0 ) {
 
-      bzero(mesg,4096);
-      n = read(newsockfd, mesg, 4095);
+      bzero(mesg, 4096);
+
+      if ( !task_q.empty() ) {
+        cout << "fromq" << endl;
+        message = task_q.front();
+        task_q.pop();
+        strcpy(mesg, message.c_str());
+        fromq = 1;
+        n = strlen(mesg)*sizeof(char);
+      }
+      else {
+        cout << "NOT fromq" << endl;
+        cout << "mesg is first :" << mesg << endl;
+        n = read(newsockfd, mesg, 4095);
+        cout << "mesg is now :" << mesg << endl;
+        message = mesg;
+        fromq = 0;
+      }
       if ( n < 0 ) error("ERROR reading from socket");
-      if ( n > 0 ) {
+      if ( n > 0 && !fromq ) {
+        mesg_split = split(message, '\n');
+        cout << "I'm dealing with " << mesg_split.size() << " messages" << endl;
+        if ( mesg_split.size() > 1 ) 
+          for (i=0; i<mesg_split.size(); i++) {
+            message = mesg_split[i];
+            task_q.push(message);
+          }
+        else {
+          fromq = 1;
+        }
+      }
+      if ( n > 0 && fromq ) {
+
         printf("       master message is: %s\n",mesg);
         if ( strncmp(mesg,"done", 4) == 0 || strncmp(mesg,"kill", 4) == 0 ) {
           cout << "dead" << endl;
@@ -365,10 +399,42 @@ int main(int argc, char **argv) {
       } else 
           continue; 
       
+      //n = write(newsockfd,"I got your message",18);
+      //if (n < 0) error("ERROR writing to socket");
 
-      n = write(newsockfd,"I got your message",18);
-      if (n < 0) error("ERROR writing to socket");
+    }
+    /*  Wait for job completion  */
+    while ( running_jobs.size() > 0 ) {
+      cout << running_jobs.size() << " JOBS ARE RUNNING" << endl;
+      if(DEBUG)  cout << "master waiting for results..." << endl;
+      data = mpiComm.recv(source=MPI.ANY_SOURCE, tag=RESULTS_TAG, status=master_status)
+      rc = MPI_Recv(&fileLen, 1, MPI_INT, MPI_ANY_SOURCE, RESULTS_TAG, 
+                    MPI_COMM_WORLD, &stat);
+      
+	    buffer=(char *)malloc(fileLen+1);
+      rc = MPI_Recv(buffer, fileLen, MPI_CHAR, stat.MPI_SOURCE, RESULTS_TAG, 
+                    MPI_COMM_WORLD, &stat);
 
+      if(DEBUG) cout << "GOT RESULT:" << buffer << endl;
+      running_jobs.remove(stat.MPI_SOURCE)
+
+      if ( protocol == "NETWORK") {
+        /*  Later ...  */
+      }
+      else if ( protocol == "TMPFS" ) {
+        TMPFS_PATH = "/dev/shm/";
+        jobid = data[:data.find(':')]
+        print '   JOBID: ' + jobid + ' FINISHED'
+        results_file = open(TMPFS_PATH + '.results_' + jobid + '.mat', 'wb')
+        results_file.write(data[data.find(':')+1:])
+        results_file.close()
+        cnn.sendall(results_file.name + '\n')
+      }
+    
+/*
+      else:
+        cnn.sendall(data)
+*/
     }
 
     close(newsockfd);
@@ -376,10 +442,13 @@ int main(int argc, char **argv) {
 
     pthread_exit(NULL);
 
+   }
   }
 
   else {
     char mesg[4096];
+    string results_filename;
+	  FILE *results_file;
 
     pthread_create(&t1, NULL, &worker_thread, (void *)pe);
 
@@ -391,7 +460,7 @@ int main(int argc, char **argv) {
     optval = 1;
     setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval);
 
-    if (sockfd < 0) 
+    if ( sockfd < 0 ) 
       error("ERROR opening socket");
     bzero((char *) &serv_addr, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
@@ -402,23 +471,15 @@ int main(int argc, char **argv) {
     listen(sockfd,5);
     clilen = sizeof(cli_addr);
 
-    while(pe->status==0){
-      sleep(1);
-    }
-    if ( pe->status == RUNNING ) {
-      while (1) {
-        newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
-        if (newsockfd < 0) 
-          error("ERROR on accept");
-        else {
-          cout << "Worker connected: " << cli_addr.sin_addr.s_addr << endl;
-          break;
-        }
-      }
+    newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+    if ( newsockfd < 0 ) 
+      error("ERROR on accept");
+    else {
+      cout << "Worker connected: " << cli_addr.sin_addr.s_addr << endl;
     }
 
-    bzero(mesg,4096);
-    n = read(newsockfd,mesg,4096);
+    bzero(mesg, 4096);
+    n = read(newsockfd, mesg, 4096);
 
     string message(mesg);
 
@@ -427,19 +488,33 @@ int main(int argc, char **argv) {
     while ( strncmp(mesg,"kill", 4) != 0 ) {
 
       // TODO:  Maybe I could get message size first
-      rc = MPI_Recv(mesg, 4096, MPI_CHAR, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &stat);
-      rc = MPI_Recv(&fileLen_split, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &stat);
-      rc = MPI_Recv(split_buff, 4096, MPI_CHAR, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &stat);
-      rc = MPI_Recv(&fileLen_shared, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &stat);
-      rc = MPI_Recv(shared_buff, 4096, MPI_CHAR, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &stat);
+      rc = MPI_Recv(mesg, 4096, MPI_CHAR, 0, MPI_ANY_TAG, 
+                    MPI_COMM_WORLD, &stat);
+      cout << "mesg :" << mesg << endl;
+      rc = MPI_Recv(&fileLen_split, 1, MPI_INT, 0, MPI_ANY_TAG, 
+                    MPI_COMM_WORLD, &stat);
+      cout << "fileLen_split :" << fileLen_split << endl;
+	    split_buff = (char *)malloc(fileLen_split);
+      rc = MPI_Recv(split_buff, 4096, MPI_CHAR, 0, MPI_ANY_TAG, 
+                    MPI_COMM_WORLD, &stat);
+      cout << "split_buff :" << split_buff << endl;
+      rc = MPI_Recv(&fileLen_shared, 1, MPI_INT, 0, MPI_ANY_TAG, 
+                    MPI_COMM_WORLD, &stat);
+      cout << "fileLen_shared :" << fileLen_shared << endl;
+	    shared_buff = (char *)malloc(fileLen_shared);
+      rc = MPI_Recv(shared_buff, 4096, MPI_CHAR, 0, MPI_ANY_TAG, 
+                    MPI_COMM_WORLD, &stat);
+      cout << "shared_buff :" << shared_buff << endl;
 
       message = mesg;
 
       mesg_split = split(message, ',');
       protocol = mesg_split[1];
       protocol = trim(protocol);
+      jobid = mesg_split[2];
+      jobid = trim(jobid);
 
-      if (stat.MPI_TAG == DO_WORK_TAG) {
+      if ( stat.MPI_TAG == DO_WORK_TAG ) {
         cout << "GOT IT!" << endl;
         cout << "protocol is " << protocol << endl;
         if ( protocol == "NETWORK" ) {
@@ -448,59 +523,97 @@ int main(int argc, char **argv) {
         else if ( protocol == "TMPFS" ) {
           string tmpfs_file(trim(mesg_split[3]));
 	        FILE *tmpfs_split_file, *tmpfs_shared_file;
-	        char *buffer; 
-	        unsigned long fileLen;
 
-          /* Read data files */
-          // I can't figure out how best to do this:
-          //ReadFile(tmpfs_file.c_str(), buffer1);
 	        tmpfs_split_file = fopen(tmpfs_file.c_str(), "wb");
-	        if (!tmpfs_split_file) error("ERROR reading tmpfs file");
-	        
-	        //Get file length
-	        //fseek(tmpfs_split_file, 0, SEEK_END);
-	        //fileLen=ftell(tmpfs_split_file);
-	        //fseek(tmpfs_split_file, 0, SEEK_SET);
-
-          vector<string> mesg_data_split = split(message, '\n');
-          for (i=0; i<mesg_data_split.size(); i++) {
-            cout << "message["<< i << "] is :" << mesg_data_split[i] << endl;
-          }
-          fwrite((const void *)mesg_data_split[2].c_str(), sizeof(char), 
-                 mesg_data_split[2].length(), tmpfs_split_file);
-  
-
-	        //Allocate memory
-	        //buffer=(char *)malloc(fileLen+1);
-	        //if (!buffer) {
-          //  fclose(tmpfs_split_file);
-          //  error ("Memory error!");
-          //}
-
-	        //Read file contents into buffer
-	        //fread(buffer, fileLen, 1, tmpfs_split_file);
-          //message.append(":::::");
-          //message.append(buffer);
+	        if (!tmpfs_split_file) error("ERROR reading tmpfs split file");
+          fwrite((const void *)split_buff, sizeof(char), fileLen_split, 
+                 tmpfs_split_file);
           fclose(tmpfs_split_file);
 
-          cout << "Worker file written" << endl;
+          tmpfs_shared_file = fopen("/dev/shm/.jshared.mat", "wb");
+	        if (!tmpfs_shared_file) error("ERROR reading tmpfs shared file");
+          fwrite((const void *)shared_buff, sizeof(char), fileLen_shared, 
+                 tmpfs_shared_file);
+          fclose(tmpfs_shared_file);
 
-/*
-          worker_tmpfs_file_shared = open('/dev/shm/.jshared.mat', 'wb')
-          worker_tmpfs_file_shared.write(mesg_data_split[2])
-          worker_tmpfs_file_shared.close()
-          mesg = mesg.split(':')[0]
-          mesg = mesg + '\n'
-          conn.sendall(mesg)
-*/
+          cout << "Worker files written" << endl;
+          if ( mesg[strlen(mesg)-1] != '\n' )
+            strcat(mesg, "\n");
+          cout << "sending mesg :" << mesg << " with length " << strlen(mesg) << endl;
+          n = write(newsockfd, mesg, strlen(mesg));
+          if (n < 0) error("ERROR writing to socket");
+          cout << "sent!" << endl;
+
         }
         else {
-/*          //conn.sendall(mesg) */
+          n = write(newsockfd, mesg, strlen(mesg));
+          if (n < 0) error("ERROR writing to socket");
         }
+
+      /*  Wait for results (filename):  */
+      bzero(mesg, 256);
+      n = read(newsockfd, mesg, 256);
+      if(DEBUG) cout << "W:" << rank << ":(finished/received)" << endl;
+
+      if ( protocol == "NETWORK" ) {
+          /*  Later ... */
+      }
+
+      else if ( protocol == "TMPFS" ) {
+        if(DEBUG)  cout <<  "results file is"  << mesg << endl;
+        results_filename = mesg;
+        results_filename = trim(results_filename);
+	      results_file = fopen(results_filename.c_str(), "wb");
+
+	      if (!results_file) error("ERROR reading tmpfs results file");
+	      fseek(results_file, 0, SEEK_END);
+	      fileLen=ftell(results_file);
+	      fseek(results_file, 0, SEEK_SET);
+
+        cout << "length is " << fileLen << endl;
+
+	      buffer=(char *)malloc(fileLen+1);
+	      if (!buffer) {
+	      	error("Memory error!");
+          fclose(results_file);
+	      }
+	      fread(buffer, fileLen, 1, results_file);
+        fclose(results_file);
+      }
+
+      strcpy(mesg, jobid.c_str());
+      strcat(mesg, ":");
+      strcat(mesg, buffer);
+      free(buffer);
+
+      cout << "W:" << rank << ": sending back mesg :" << mesg << endl;
+
+      /*  Send results (filename) back to master:  */
+      rc = MPI_Send((void *)mesg, fileLen+jobid.length()+1, MPI_CHAR, 0, RESULTS_TAG, MPI_COMM_WORLD);
+
+/*
+      # See if the master has decided to die:
+      #mpiComm.Iprobe(source=0, tag=KILL_TAG, status=worker_status)
+      #if (worker_status.tag == KILL_TAG):
+      #  if(DEBUG):print 'KILL MESSAGE came from ' + str(worker_status.source)
+      #  kill = mpiComm.recv(source=worker_status.source, tag=worker_status.tag)
+*/
+
 
 
       }
+      else if ( stat.MPI_TAG == KILL_TAG ){
+/*
+        if protocol == 'NETWORK':
+          semaphore.acquire()
+          memory.unlink()
+          mapfile.close()
 
+        conn.sendall("kill")
+        conn.close()
+        break
+*/
+      }
 
     }
 

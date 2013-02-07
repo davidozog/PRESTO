@@ -21,7 +21,7 @@ function mworker(my_hostname, rank)
     error(ME.identifier, 'Worker Connection Error: %s', ME.message)
   end
 
-  % Send alive signal to the master 
+  % Send alive signal to the worker process 
   mesg = 'alive';
   out.println(mesg);
 
