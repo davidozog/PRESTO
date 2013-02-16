@@ -1,0 +1,24 @@
+# this file contains tissue properties
+# columns are: 
+# (1) tissue name 
+# (2) tissue label 
+# (3) tissue default conductivity in siemens/meter
+# (4) a 3 character flags from left to right:
+#  -1- allow/disallow tissue to have source/sink 
+#  -2- allow/disallow tissue to have dipoles
+#  -3- allow/disallow tissue to have sensors
+
+# Note: tissue labels must be unique, two tissues with the same 
+# label triggers the code to abort 
+
+air             0      0.0     00
+wm              1      0.35    00
+junk            13     0.88    00
+skull           2      0.018   00
+scalp           3      0.44    10
+brain           23     0.99    10
+csf             4      1.79    00
+gm              5      0.25    01
+iair            6      0.0     00
+eyeballs        7      1.5     01
+skulltocsf      8      1.79    00

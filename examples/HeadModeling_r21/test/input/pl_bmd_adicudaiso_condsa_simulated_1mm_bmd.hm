@@ -1,0 +1,54 @@
+########################################################################
+###                   COMPUTATION INPUT FILE                  ##########
+########################################################################
+#: parallelism          gpu
+#: task                 cond
+#: num_nodes            2
+#: output_name_prefix   pl_bmd_adicudaiso_condsa_simulated_1mm_bmd
+#: max_time             20
+
+datapath                data/BoneDensityData
+braink_data_dir         PlBoneDens
+data_set_kind		indiv_cond_CT
+
+output_name_prefix	pl_bmd_adicudaiso_condsa_simulated_1mm_bmd
+
+algorithm               adi
+parallelism             cuda
+
+time_step		2.0
+tol			0.001
+max_iter		1500
+
+tissues			air  wm    skull scalp csf   gm    iair eyeballs skullsoft  skullmetal  
+tissues_conds	        0.0  0.35  100    0.2  1.79  0.25  0.0  1.5      0.03      10 
+bone_density_mode       1
+
+################ Cond optimization parameters
+
+variable_tissues 	skull	scalp  skullsoft
+lower_bound		1	0.05   0.01     
+upper_bound		300	1.0    0.8          
+
+objective_func		l2norm
+
+# simulated data: (air, 0.0) (wm, 0.35) (skull, 70) (scalp, 0.54) (csf, 1.79) (gm, 0.25) (iair, 0.0) 
+#                 (eyeballs, 1.5) (skullsoft, 0.07) (skullmetal, 10)
+
+measured_data           PlBoneDens/ci/pl_bmd_cond_i110s50_22microA_bmd_cuda.ci
+
+optim_method		sa
+
+############### Simulated annealing parameters 
+rand_seed		123
+optim_tolerance		0.05
+rt			0.6
+simanneps		0.00001
+ns			12
+nt			3
+check			3
+max_func_eval		5000
+uratio			0.6
+lration			0.4
+inital_temp		5
+vm_initial              100  1  1 

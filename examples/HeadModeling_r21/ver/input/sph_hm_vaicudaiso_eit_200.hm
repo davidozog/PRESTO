@@ -1,0 +1,41 @@
+#################################################################
+##    Test Forward solver                             ###########
+#################################################################
+#: task                         for
+#: num_nodes                    1
+#: parallelism                  gpu
+#: max_time                     1
+#: output_name_prefix           sph_hm_vaicudaiso_eit_200
+
+datapath                data/anisph/
+geometry		spherec_geom_200.dat
+sensors                 spherec_sns_200.txt
+
+#specify the algorithm  [adi | vai] and parallelism [omp | cuda] 
+algorithm               vai 
+parallelism             cuda
+
+output_name_prefix	sph_hm_vaicudaiso_eit_200
+
+################ Forward solver parameters 
+tol			0.000001
+max_iter		2000
+time_step		2.0
+
+convergence_check       50
+convergence_eps         0.00000001;
+
+tissues                 air    brain     csf    skull    scalp
+tissues_conds           0.0    .25      1.79     .0045  .44
+skull_normal_cond       0.0045
+tang_to_normal_ration   1
+
+
+current 		100
+current_src 		61
+current_sink            67
+
+#current_src 		41 101 99
+#current_sink            41 99  99
+#or for all volume [sensors | head ]. If not specified both will
+solution 		sensors

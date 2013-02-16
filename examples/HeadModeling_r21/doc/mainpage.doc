@@ -1,0 +1,408 @@
+/*! \page page1 A documentation page
+Leading text.
+\section sec An example section
+
+This page contains the subsections \ref subsection1 and \ref subsection2.
+For more info see page \ref page2.
+\subsection subsection1 The first subsection
+Text.
+\subsection subsection2 The second subsection
+More text.
+*/
+/*! \page page2 Another page
+Even more info.
+*/
+
+
+
+/*! \mainpage Head Modeling project
+
+The HeadModeling project is under version control at: https://www.nic.uoregon.edu/nicsvn/HeadModeling
+
+- \subpage intro
+- \subpage installation 
+- \subpage usage
+- \subpage verification
+
+*/
+//---------------------------------------------------------------------------------
+
+/*! \page intro Introduction
+
+The head modeling tools contain two Finite Difference solvers to solve the Poisson equation for electromagntic problem, ADI and VAI. The ADI solver considers only isotropic head tissues conductivities and is based on the ADI algorithm. The VAI solver can handle anisotropic properties of the head tissues conductivities and is based on the Vector Additive Algorithm. Both Solvers are used in EIT conductivity optimization and in the generation of the LFM for source analysis.
+
+- \subpage lfmGen 
+- \subpage condOptim 
+
+*/
+
+/*! \page lfmGen Lead Field Matrix generation */
+
+/*! \page condOptim EIT conductivity optimization*/
+
+
+//---------------------------------------------------------------------------------
+
+/*! \page installation Installation
+
+1) Download the project \n
+   $ svn co https://www.nic.uoregon.edu/nicsvn/HeadModeling \n\n
+2) Build the project \n
+   $ make \n\n
+3) Set HEAD_MODELING_HOME environment variable to the root\n
+   $ export HEAD_MODELING_HOME=/path/to/HeadModeling \n\n
+4) Add $(HEAD_MODELING_HOME/bin) to you PATH \n
+   $ export PATH=$PATH:$HEAD_MODELING_HOME/bin\n
+	
+*/
+
+//---------------------------------------------------------------------------------
+
+/*! \page usage Usage 
+
+The Head Modeling tools can be used to obtain forward solutions, generating a Lead Field Matrix or searching for the oprimal conductivities using EIT data. These tools are to be executed on a multinode cluster using the front end python script HMtools located in the bin directory. Running any of these jobs is achieved by passing the Head Model input file as argument to HMtools:\n
+\n
+\verbatim $ HMtools input_file.hm \endverbatim
+\n
+The structure of the <CODE> input_file.hm </CODE> for LFM generation, conductivity optimization or forward solution are similar and described below.
+ 
+- \subpage forward
+- \subpage lfm
+- \subpage cond
+
+*/
+
+
+/*! \page lfm Lead Field Matrix
+
+
+This is an example of an input file for the lead field matrix generation.
+
+\verbatim 
+#################################################################
+##    Test LFM GPU implementation using reciprocity   ###########
+#################################################################
+
+################ Parameters to submit the job to mist cluster
+#: parallelism	                gpu
+#: num_nodes			2
+#: update			0
+#: max_time                     20
+#: task                         lfm
+#: output_name_prefix	        ch_bk_adicudaiso_lfmtriprec_1mm
+
+################ Parameters for the LFM computation  
+
+datapath                /home/users/adnan/anisotropic/head_modeling/data/ch_braink_lfm_306/
+braink_data_dir         FDM_CH_Talairach_306_m12y2011
+data_set_kind           indiv_trip_CT
+
+# output name 
+output_name_prefix	ch_bk_adicudaiso_lfmtriprec_1mm
+lfm_endianness          little
+unit_standard           physics_am2v
+print_data_set		0
+
+use_reciprocity         1
+use_triples             1
+
+dipole_moment_mag	0.002
+ref_electrode           Cz
+
+################ Forward solver parameters 
+
+algorithm               adi
+parallelism             cuda
+
+time_step		2.5
+tol			0.001
+max_iter		1500
+
+convergence_check       5
+convergence_eps         0.000001;
+
+tissues			air   wm   skull  scalp	 csf	gm    iair 
+tissues_conds		0.0  .35    .018  .44    1.79	.25   0.0  
+skull_normal_cond       0.018
+tang_to_normal_ration   1
+
+\endverbatim
+
+@b HMtools @b Job:
+
+\param parallelism             <CODE> < gpu | omp | auto > </CODE> - Chooses the executable.  Option 'auto' chooses for you. 
+\param num_nodes               The number of compute nodes for performing the calculation  
+\param update                  (not implemented) Perform an SVN update and compilation before execution (1 for "yes", 0 for "no)
+\param max_time                Maximum cutoff time for execution
+\param task                    <CODE> < lfm | cond | for > </CODE>
+\param output_name_prefix	     String prefix prepended to output directory and file names
+
+@b LFM:
+\param datapath                The path containing BrainK data
+                               <UL>
+                               <LI> If <CODE>datapath</CODE> begins with '/', the full path is resolved </LI>
+                               <LI> If <CODE>datapath</CODE> begins without '/', the path relative to $HEAD_MODELING_HOME is resolved </LI>
+                               <LI> If <CODE>datapath</CODE> is empty or missing, looks in <CODE>output_name_prefix</CODE> </LI>
+                               </UL>
+\param braink_data_dir         Name of the Directory containing the BrainK data
+\param data_set_kind           <CODE> < indiv_odip_MR | indiv_odip_CT | indiv_trip_MR | indiv_trip_CT | ... > </CODE> \n(see $HEAD_MODELING_HOME/cfg/braink_file_ext.cfg)
+\param output_name_prefix	     <CODE> < (STRING) ></CODE> - String prefix prepended to output directory and file names
+\param lfm_endianness          <CODE> <little | big | auto | > </CODE> - String machine endian
+\param unit_standard          <CODE> <physics_am2v | psychophysiology_nam2microv > </CODE> - String lfm units 
+\param print_data_set		       <CODE> < 0 | 1 ></CODE> - Print data set
+\param use_reciprocity         <CODE> < 0 | 1 ></CODE> - Use reciprocity principle
+\param use_triples             <CODE> < 0 | 1 ></CODE> - Use (x,y,z) triples for dipole representation
+\param dipole_moment_mag	     <CODE> < (FLOAT) > </CODE> Magnetic moment of the dipoles
+\param ref_electrode           <CODE> < Cz | (INT) ></CODE> - Location of the reference electrode
+\param parallelism             <CODE> < auto | cuda | omp ></CODE> - Automatic, CUDA or OpenMP parallelism (both use MPI)
+
+@b Forward @b Solver:
+\param algorithm               <CODE> < adi | vai ></CODE> - Algorithm type (ADI = isotropic, VAI = anisotropic)
+\param time_step		           <CODE> < (FLOAT) ></CODE> - Solver time step \n(higher = faster, less accurate, need fewer iterations ... lower = slower, more accurate, need more iterations) (2.5 is recommended)
+\param tol			               <CODE> < (FLOAT) ></CODE> - Convergence tolerance (0.001 is recommended)
+\param max_iter		             <CODE> < (INT) ></CODE> - Maximum number of iterations before cutoff
+\param convergence_check       <CODE> < (INT) > </CODE> 
+\param convergence_eps         <CODE> < (FLOAT) ></CODE> - Epsilon value for forward solver convergence
+\param tissues			           Modeled tissues (see $HEAD_MODELING_HOME/cfg/tissue_config.txt)
+\param tissues_conds		       Corresponding tissue conductivities (see $HEAD_MODELING_HOME/cfg/tissue_config.txt)
+\param skull_normal_cond       <CODE> < (FLOAT) ></CODE> - Skull normal conductivity
+\param tang_to_normal_ration   <CODE> < (FLOAT) ></CODE> - Anisotropic ration of the tangential to the normal component of the conductivity (the isotropic limit is 1)
+
+*/
+
+
+/*! \page cond Conductivity Optimization 
+
+This is an example of an input file for solving the conductivity inverse problem.
+
+\verbatim 
+
+########################################################################
+###                   COMPUTATION INPUT FILE                  ##########
+########################################################################
+
+################ Parameters to submit the job to mist cluster
+#: parallelism          gpu
+#: num_nodes            2
+#: update               0
+#: output_name_prefix   ch_bk_adicudaiso_condsa_simulated_2mm
+#: max_time             20
+#: task                 cond
+#: output_name_prefix   ch_bk_adicudaiso_lfmtriprec_1mm
+
+############### Forward solver related parameters 
+
+datapath                data/test_cond_2mm
+braink_data_dir         Conductivity_CH_NonTalairach_r310_2mm
+data_set_kind		indiv_cond_CT
+output_name_prefix      ch_bk_adicudaiso_condsa_simulated_2mm
+
+algorithm               adi
+parallelism             cuda
+
+time_step		2.5
+tol			0.001
+max_iter		3000
+tissues			air   wm     skull   scalp  csf	  gm	iair 
+tissues_conds		0.0   0.08   0.041   0.2   1.65  0.25  0.0      
+
+################ Cond optimization parameters
+variable_tissues 	wm	skull	scalp
+lower_bound		0.05	0.001	0.05
+upper_bound		1.0	0.1	1.0
+
+# [l2norm, normL2norm, relL2norm]
+objective_func		l2norm
+
+measured_data           current_inj/ch_simmeas_i117_s58.ci
+
+# simplex | sa
+optim_method		sa
+
+############### Simulated annealing parameter
+simplex_eps             0.0001
+
+############### Simulated annealing parameter
+rand_seed		123
+optim_tolerance		0.00005
+rt			0.8
+simanneps		0.00001
+ns			12
+nt			3
+check			3
+max_func_eval		5000
+uratio			0.6
+lration			0.4
+inital_temp		5
+vm_initial		1 1 1
+cstep			2 2 2
+
+\endverbatim
+
+@b HMtools @b Job:
+
+\param parallelism             <CODE> < gpu | omp | auto > </CODE> - Chooses the executable.  Option 'auto' chooses for you. 
+\param num_nodes            The number of compute nodes for performing the calculation  
+\param update               (not implemented) Perform an SVN update and compilation before execution (1 for "yes", 0 for "no)
+\param max_time             Maximum cutoff time for execution
+\param task                 <CODE> < lfm | cond | for > </CODE>
+\param output_name_prefix   String prefix prepended to output directory and file names
+
+@b Forward @b Solver:
+\param datapath            The path containing BrainK data
+                           <UL>
+                              <LI> If <CODE>datapath</CODE> begins with '/', the full path is resolved </LI>
+                              <LI> If <CODE>datapath</CODE> begins without '/', the path relative to $HEAD_MODELING_HOME is resolved </LI>
+                              <LI> If <CODE>datapath</CODE> is empty or missing, looks in <CODE>output_name_prefix</CODE> </LI>
+                           </UL>
+\param braink_data_dir      Name of the Directory containing the BrainK data
+\param data_set_kind       <CODE> < indiv_odip_MR | indiv_odip_CT | indiv_trip_MR | indiv_trip_CT | ... > </CODE> \n(see $HEAD_MODELING_HOME/cfg/braink_file_ext.cfg)
+\param output_name_prefix	<CODE> < (STRING) ></CODE> - String prefix prepended to output directory and file names
+\param print_data_set		       <CODE> < 0 | 1 ></CODE> - Print data set
+\param algorithm               <CODE> < adi | vai ></CODE> - Algorithm type (ADI = isotropic, VAI = anisotropic)
+\param parallelism             <CODE> < auto | cuda | omp ></CODE> - Automatic, CUDA or OpenMP parallelism (both use MPI)
+\param time_step		           <CODE> < (FLOAT) ></CODE> - Solver time step \n(higher = faster, less accurate, need fewer iterations ... lower = slower, more accurate, need more iterations) (2.5 is recommended)
+\param tol			               <CODE> < (FLOAT) ></CODE> - Convergence tolerance (0.001 is recommended)
+\param max_iter		             <CODE> < (INT) ></CODE> - Maximum number of iterations before cutoff
+\param convergence_check       <CODE> < (INT) > </CODE> 
+\param convergence_eps         <CODE> < (FLOAT) ></CODE> - Epsilon value for forward solver convergence
+\param tissues			           Modeled tissues (see $HEAD_MODELING_HOME/cfg/tissue_config.txt)
+\param tissues_conds		       Corresponding tissue conductivities (see $HEAD_MODELING_HOME/cfg/tissue_config.txt)
+\param skull_normal_cond       <CODE> < (FLOAT) ></CODE> - Skull normal conductivity
+\param tang_to_normal_ration   <CODE> < (FLOAT) ></CODE> - Anisotropic ration of the tangential to the normal component of the conductivity (the isotropic limit is 1)
+
+@b Conductivity @b Optimization:
+\param variable_tissues 	     Strings of tissue types to vary in inverse search
+\param lower_bound		         Corresponding lower bounds for tissue conductivities in inverse search
+\param upper_bound		         Corresponding upper bounds for tissue conductivities in inverse search
+\param objective_func		       <CODE> < l2norm | normL2norm | relL2norm > </CODE>- The type of objective function
+\param measured_data           Path for finding current injection files in the CI format 
+                               <UL>
+                                 <LI> If <CODE>measured_data</CODE> begins with '/', the full path is resolved </LI>
+                                 <LI> If <CODE>measured_data</CODE> begins without '/', the path relative to $HEAD_MODELING_HOME is resolved </LI>
+                               </UL>
+\param optim_method		         <CODE> < sa | simplex > </CODE>- Algorithm for inverse search optimization
+
+
+@b Inverse @b Optimization: 
+\param rand_seed		           <CODE> < (INT) > </CODE>- Seed for the random number generator
+\param optim_tolerance		     <CODE> < (FLOAT) > </CODE>- Tolerance for inverse search
+\param rt			                 <CODE> < (FLOAT) > </CODE>- Temperature reduction factor (\ref SimAnneal)
+\param simanneps		           <CODE> < (FLOAT) > </CODE>- Epsilon value for determining optimization convergence
+\param ns			                 <CODE> < (INT) > </CODE>- Number of search loops before step length adjusted  
+\param nt			                 <CODE> < (INT) > </CODE>- Number of loops before temperature is adjustd 
+\param check			             <CODE> < (INT) > </CODE>- Number of iteration to check for not changing optimal value
+\param max_func_eval		       <CODE> < (INT) > </CODE>- Maximum function evaluations before cutoff
+\param uratio			             <CODE> < (FLOAT) > </CODE>- ratio adjustment (lower limit)
+\param lration			           <CODE> < (FLOAT) > </CODE>-   ratio adjustment (upper limit)
+\param inital_temp		         <CODE> < (INT) > </CODE>- Initial temperature for Simulated Annealing
+\param vm_initial		           <CODE> < (INT) (INT) (INT) > </CODE>- initial step length
+\param cstep			             <CODE> < (INT) (INT) (INT) > </CODE>- step length adjustment factor 
+
+
+*/
+
+/*! \page forward Forward Solver 
+
+This is an example of an input file for performing a single forward solution.
+
+\verbatim 
+
+########################################################################
+#######                     FORWARD SOLVER                    ##########
+########################################################################
+
+################ Parameters to submit the job to mist cluster
+#: parallelism          gpu
+#: num_nodes            1
+#: update               0
+#: output_name_prefix   ch_bk_adicudaiso_condsa_simulated_2mm
+#: max_time             1
+#: task                 for
+#: output_name_prefix   ch_bk_adicudaiso_lfmtriprec_1mm
+
+############### Forward solver parameters 
+#datapath                /home/users/adnan/projects/HeadModeling/trunk/data/test_cond_2mm
+datapath                data/test_cond_2mm
+braink_data_dir         Conductivity_CH_NonTalairach_r310_2mm
+data_set_kind		indiv_cond_CT
+output_name_prefix      ch_bk_adicudaiso_condsa_simulated_2mm
+
+algorithm               adi
+parallelism             cuda
+
+
+time_step		2.5
+tol			0.001
+max_iter		3000
+tissues			air   wm     skull   scalp  csf	  gm	iair 
+tissues_conds		0.0   0.08   0.041   0.2   1.65  0.25  0.0      
+skull_normal_cond       0.0045
+tang_to_normal_ration   8
+
+current 		100
+current_src             41 101 99 
+current_sink            41 99  99
+
+solution 		sensors
+
+\endverbatim
+
+@b HMtools @b Job:
+
+\param parallelism             <CODE> < gpu | omp | auto > </CODE> - Chooses the executable.  Option 'auto' chooses for you. 
+\param num_nodes               The number of compute nodes for performing the calculation  
+\param update                  (not implemented) Perform an SVN update and compilation before execution (1 for "yes", 0 for "no)
+\param max_time                Maximum cutoff time for execution
+\param task                    <CODE> < lfm | cond | for > </CODE>
+\param output_name_prefix	     String prefix prepended to output directory and file names
+
+@b Forward @b Solver:
+\param datapath                The path containing BrainK data
+                               <UL>
+                                 <LI> If <CODE>datapath</CODE> begins with '/', the full path is resolved </LI>
+                                 <LI> If <CODE>datapath</CODE> begins without '/', the path relative to $HEAD_MODELING_HOME is resolved </LI>
+                                 <LI> If <CODE>datapath</CODE> is empty or missing, looks in <CODE>output_name_prefix</CODE> </LI>
+                               </UL>
+\param braink_data_dir         Name of the Directory containing the BrainK data
+\param data_set_kind           <CODE> < indiv_odip_MR | indiv_odip_CT | indiv_trip_MR | indiv_trip_CT | ... > </CODE> \n(see $HEAD_MODELING_HOME/cfg/braink_file_ext.cfg)
+\param output_name_prefix	     <CODE> < (STRING) ></CODE> - String prefix prepended to output directory and file names
+\param print_data_set		       <CODE> < 0 | 1 ></CODE> - Print data set
+\param algorithm               <CODE> < adi | vai ></CODE> - Algorithm type (ADI = isotropic, VAI = anisotropic)
+\param parallelism             <CODE> < auto | cuda | omp ></CODE> - Automatic, CUDA or OpenMP parallelism (both use MPI)
+\param time_step		           <CODE> < (FLOAT) ></CODE> - Solver time step \n(higher = faster, less accurate, need fewer iterations ... lower = slower, more accurate, need more iterations) (2.5 is recommended)
+\param tol			               <CODE> < (FLOAT) ></CODE> - Convergence tolerance (0.001 is recommended)
+\param max_iter		             <CODE> < (INT) ></CODE> - Maximum number of iterations before cutoff
+\param convergence_check       <CODE> < (INT) > </CODE> 
+\param convergence_eps         <CODE> < (FLOAT) ></CODE> - Epsilon value for forward solver convergence
+\param tissues			           Modeled tissues (see $HEAD_MODELING_HOME/cfg/tissue_config.txt)
+\param tissues_conds		       Corresponding tissue conductivities (see $HEAD_MODELING_HOME/cfg/tissue_config.txt)
+\param skull_normal_cond       <CODE> < (FLOAT) ></CODE> - Skull normal conductivity
+\param tang_to_normal_ration   <CODE> < (FLOAT) ></CODE> - Anisotropic ration of the tangential to the normal component of the conductivity (the isotropic limit is 1)
+
+\param current 		             <CODE> < (FLOAT) > </CODE>- Current injection value in microamps.
+\param current_src             <CODE> < (INT) (INT) (INT) > </CODE>- Cartesian coordinates of the source injection channel\n OR <CODE> < (INT) > </CODE>- The electrode number
+\param current_sink            <CODE> < (INT) (INT) (INT) > </CODE>- Cartesian coordinates of the sink injection channel\n OR <CODE> < (INT) > </CODE>- The electrode number
+\param solution 		           <CODE> < sensors | head > </CODE>- Output sensors or full head volume
+
+*/
+
+
+
+
+/*! \page verification Verification
+
+The FDM forward solution is verified by comparing the FDM isotropic and anisotropic solution with the analytic isotropic and anisotropic 4-shell spherical model. In case of real geometry, cross verification between the ADI and VAI in isotropic setting is considered. Verification of LFM generation is achieved by cross verification using ADI, VAI, using reciprocity and using the forward solution. Verification of the conductivity optimization is achieved by using synthatic simulated EIT data corresponding to a preset of conductivity values, and then retrieving these parameters using both ADI, VAI, simplex and simulated annealing. The data sets used in these verification can be copied from /home/users/adnan/projects/rep_hm/HeadModeling/branches/HeadModelingDoc/data on mist.cs.uoregon.edu and placed in $HEAD_MODELING_HOME/data. The headmodling input files that are used for verification are located in $HEAD_MODELING_HOME/ver/input. Bellow are the steps to generate the verification:
+\n\n
+
+-# copy the data sets (on mist) \n
+   \verbatim $ cp -r /home/users/adnan/projects/rep_hm/HeadModeling/branches/HeadModelingDoc/data $HEAD_MODELING_HOME/ \endverbatim \n\n 
+-# run the HMtools \n
+   \verbatim $ HMtools -ver \endverbatim \n\n
+-# Look at the results using matlab by executing the script in $HEAD_MODELING_HOME/matlab/ver_code.m\n\n
+
+*/
+
+
+
+

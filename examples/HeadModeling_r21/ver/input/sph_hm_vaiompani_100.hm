@@ -1,0 +1,42 @@
+#################################################################
+##    Test Forward solver                             ###########
+#################################################################
+#: task                         for
+#: num_nodes			1
+#: parallelism	                omp
+#: max_time                     1
+#: output_name_prefix           sph_hm_vaiompani_100
+
+datapath                data/anisph/
+geometry		anisph_geom_100.dat
+sensors                 anisph_sns_100.txt
+normals                 anisph_norm_100.txt
+
+#specify the algorithm  [adi | vai] and parallelism [omp | cuda] 
+algorithm               vai
+parallelism             omp
+
+# output name 
+output_name_prefix	sph_hm_vaiompani_100
+
+################ Forward solver parameters 
+tol			0.0001
+max_iter		3000
+
+convergence_check       50
+convergence_eps         0.00000001;
+
+tissues		        air    scalp    skull    csf    brain
+tissues_conds		0.0    .44      .018     1.79	.25
+skull_normal_cond       0.0045
+tang_to_normal_ration   8
+
+current 		100
+current_src 		20 51 49
+current_sink            20 49 49
+
+# Relevant for adi only
+time_step		2.0
+
+# For all volume or sensors only [sensors | head ]. 
+solution 		sensors

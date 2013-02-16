@@ -1,0 +1,56 @@
+########################################################################
+###                   COMPUTATION INPUT FILE                  ##########
+########################################################################
+############### Forward solver related parameters 
+#: parallelism          omp
+#: task                 cond
+#: num_nodes            2
+#: output_name_prefix   pl_bmd_adiompiso_condsim_simulated_1mm_uni
+#: max_time             20
+
+datapath                data/BoneDensityData
+braink_data_dir         PlBoneDens
+data_set_kind		indiv_cond_CT
+
+output_name_prefix	pl_bmd_adiompiso_condsim_simulated_1mm_uni
+
+algorithm               adi
+parallelism             omp
+
+time_step		1.0
+tol			0.001
+max_iter		1500
+
+tissues			air wm   skull scalp csf  gm   iair eyeballs skullsoft skullmetal  
+tissues_conds	        0.0 0.35 0.02  0.19  1.79 0.25 0.0  1.5      0.02      10 
+bone_density_mode       0
+
+################ Cond optimization parameters
+
+variable_tissues 	skull	scalp  skullsoft
+lower_bound		0.0005	0.05   0.01     
+upper_bound		0.2	1.0    0.8          
+
+objective_func		l2norm
+
+# simulated data: (air, 0.0) (wm, 0.35) (skull, 70) (scalp, 0.54) (csf, 1.79) (gm, 0.25) (iair, 0.0) 
+#                 (eyeballs, 1.5) (skullsoft, 0.07) (skullmetal, 10)
+
+measured_data           PlBoneDens/ci/pl_bmd_cond_i110s50_22microA_bmd.ci
+
+optim_method		simplex
+simplex_eps             0.0001
+
+############### Simulated annealing parameters 
+rand_seed		123
+optim_tolerance		0.05
+rt			0.6
+simanneps		0.00001
+ns			12
+nt			3
+check			3
+max_func_eval		1000
+uratio			0.6
+lration			0.4
+inital_temp		5
+vm_initial              1  1  1 

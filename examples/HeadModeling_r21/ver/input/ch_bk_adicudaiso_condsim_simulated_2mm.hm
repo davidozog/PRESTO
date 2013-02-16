@@ -1,0 +1,53 @@
+########################################################################
+###                   COMPUTATION INPUT FILE                  ##########
+########################################################################
+#: parallelism          gpu
+#: task                 cond
+#: output_name_prefix   ch_bk_adicudaiso_condsim_simulated_2mm
+#: num_nodes            1
+
+datapath                data/test_cond_2mm
+braink_data_dir         Conductivity_CH_NonTalairach_r310_2mm
+data_set_kind		indiv_cond_CT
+output_name_prefix      ch_bk_adicudaiso_condsim_simulated_2mm
+
+algorithm               adi
+parallelism             cuda
+
+time_step		3.0
+tol			0.001
+max_iter		3000
+tissues			air   wm     skull   scalp  csf	  gm	iair 
+tissues_conds		0.0   0.25   0.018   0.65   1.65  0.25  0.0      
+
+################ Cond optimization parameters
+variable_tissues 	wm	skull	scalp
+lower_bound		0.05	0.001	0.05
+upper_bound		1.0	0.1	1.0
+
+# [l2norm, normL2norm, relL2norm]
+objective_func		l2norm
+
+#simulated data generated 
+# wm = .33  skull = .021 scalp = .55
+
+measured_data           current_inj/ch_simmeas_i117_s58.ci
+
+# simplex | sa
+optim_method		simplex
+simplex_eps             0.0001
+
+############### Simulated annealing parameter
+rand_seed		123
+optim_tolerance		0.00005
+rt			0.8
+simanneps		0.0001
+ns			12
+nt			3
+check			3
+max_func_eval		1000
+uratio			0.6
+lration			0.4
+inital_temp		5
+vm_initial		1 1 1
+cstep			2 2 2

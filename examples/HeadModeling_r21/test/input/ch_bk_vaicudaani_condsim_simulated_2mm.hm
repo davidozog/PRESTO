@@ -1,0 +1,61 @@
+########################################################################
+###                   COMPUTATION INPUT FILE                  ##########
+########################################################################
+#: parallelism          gpu
+#: task                 cond
+#: output_name_prefix   ch_bk_vaicudaani_condsim_simulated_2mm
+#: num_nodes            1
+
+############### Forward solver related parameters 
+
+datapath                data/ch_braink_cond_2mm_310/
+braink_data_dir         Conductivity_CH_NonTalairach_r310_2mm_m12Y2011 
+data_set_kind		indiv_cond_CT
+output_name_prefix      ch_bk_vaicudaani_condsim_simulated_2mm
+
+algorithm               vai
+parallelism             cuda
+
+time_step		3.0
+tol			0.000001
+max_iter		1500
+
+convergence_check       5
+convergence_eps         0.000001
+
+tissues			air   wm     skull   scalp  csf	  gm	iair 
+tissues_conds		0.0   0.33   0.041   0.2   1.65  0.25  0.0   
+
+tang_to_normal_ration   1
+skull_normal_cond       0.01
+
+################ Cond optimization parameters
+
+variable_tissues 	skull	scalp skull_normal_cond tang_to_normal_ration 
+lower_bound		0.001	0.05   0.001              1
+upper_bound		0.1	1.0    0.1	          6
+
+objective_func		l2norm
+
+# simultaed data 
+# wm = 0.33; skull = 0.021; scalp = 0.54; skull radial = 0.021; 
+# tang_to_rad_ratio = 3;
+
+measured_data           current_inj/ch_simmeas_i117_s58_ani.ci
+optim_method		simplex
+simplex_eps             0.0001;
+
+############### Simulated annealing parameters 
+
+rand_seed		123
+optim_tolerance		0.0005
+rt			0.8
+simanneps		0.00001
+ns			12
+nt			3
+check			3
+max_func_eval		20
+uratio			0.6
+lration			0.4
+inital_temp		5
+

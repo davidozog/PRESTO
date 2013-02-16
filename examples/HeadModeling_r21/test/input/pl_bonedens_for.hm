@@ -1,0 +1,39 @@
+#################################################################
+##    Test Forward solver                             ###########
+#################################################################
+#: task                         for
+#: parallelism                  omp
+#: max_time                     20
+#: output_name_prefix           pl_bonedens
+
+datapath                data/BoneDensityData
+braink_data_dir         PlBoneDens
+data_set_kind           indiv_trip_CT
+
+algorithm               adi
+parallelism             omp
+
+output_name_prefix	pl_bonedens
+
+################ Forward solver parameters 
+tol			0.002
+max_iter		2000
+time_step		2.8
+
+tissues	                air   wm    skull   scalp  csf   gm    iair   eyeballs  skullsoft  skullmetal
+tissues_conds		0.0   0.35  .018    0.44   1.79  0.25  0.0    1.5       0.07       10     
+
+bone_density_mode       0
+
+#atten_cond_fact        100
+current 		21
+current_src 	        104 
+current_sink            57 
+
+#current_src 		51 129 127 
+#current_sink           51 127 127 
+
+#Output solution either at the sensors if sensors are provided 
+#or for all volume [sensors | head ]. If not specified both will
+#be output
+#solution 		head

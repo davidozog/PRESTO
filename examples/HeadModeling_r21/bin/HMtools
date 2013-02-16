@@ -1,0 +1,436 @@
+#!/usr/bin/env python
+
+import os
+import random
+import sys
+import subprocess
+import shutil
+import platform
+
+class HMtools:
+    
+    def __init__(self, input_file):
+
+        self.hm_input_file       = input_file
+        self.num_nodes           = 1
+        self.prog_name           = ''
+        self.max_time_hour       = 24;
+        self.queue               = ''
+        self.omp_num_threads     = 8;
+        self.pbs_modules         = '';
+        
+        self.prog_arg            = input_file
+        self.cwd                 = os.getcwd()
+        self.update              = False
+        self.parallelism         = 'omp'
+        self.task                = None
+        self.output_name_prefix  = '__'
+        self.gpus_per_node       = 0
+        self.num_procs           = 1
+        self.mpiarg              = ''
+        self.load_params()
+
+        self.prog_arg = os.path.split(input_file)[1]
+        if self.task not in ['lfm', 'cond', 'for']:
+            raise Exception ("Error: unrecognized task: %s " % self.task)
+            
+        self.hm_home = os.getenv("HEAD_MODELING_HOME")
+
+        if self.hm_home is None:
+            raise Exception ("Error: undefined environment variable "
+                             "HEAD_MODELING_HOME ")
+
+        if self.parallelism  not in ['gpu', 'omp']:
+            raise Exception ("Error: unsupported parallelism: %s " % \
+                             self.parallelism)
+
+        self.load_pbs_queue()
+        self.load_prog_name()
+        self.load_pbs_modules(self.prog_name)
+
+        self.prog_full_path = os.path.join(self.hm_home,
+                                           'bin/%s' % self.prog_name)
+        if not os.path.exists(self.prog_full_path):
+            raise Exception  ("Error: executable does not exist ")
+        
+        self.output_dir = self.output_name_prefix + "_output"
+        self.output_dir = os.path.join(self.cwd, self.output_dir)
+        
+        if not os.path.exists(self.output_dir):
+            os.mkdir(self.output_dir)
+            
+        shutil.copy(input_file, self.output_dir)
+        os.chdir( self.output_dir )
+
+        self.write_pbs_script()
+
+        self.run()
+        os.chdir(self.cwd)
+
+
+    def load_pbs_modules(self, prog_name):
+        machine = platform.node().strip().split('.')[0]
+        modules_filename = os.path.join(self.hm_home, 'cfg/modules.txt')
+        modules_file = open(modules_filename, 'r')
+        pbs_modules = {}
+        for line in modules_file:
+          line = line.split()
+          pbs_modules[line[0][:-1]] = ' '.join(line[5:])
+        try:
+            self.pbs_modules = pbs_modules[prog_name]
+        except:
+            return 
+    
+    def write_pbs_script(self):
+        
+        job_name                = self.output_name_prefix
+        self.pbs_shell_fname    = self.output_name_prefix + ".sh"
+        log_fname               = self.output_name_prefix + ".log"
+        std_outerr_fname        = self.output_name_prefix + ".out"
+
+        mt_hours = int(self.max_time_hour)
+        mt_min   = int((self.max_time_hour - mt_hours)*60)
+        gpus_per_node = self.gpus_per_node
+
+        if self.task == 'lfm':
+
+            procs_geom  =  "#PBS -l nodes=%d:ppn=%d"  % \
+                          (self.num_nodes, self.cores_per_node)
+            
+            self.num_procs = self.num_nodes * self.cores_per_node
+
+            if self.num_procs < 2:
+                raise Exception ("Number processes of LFM computation "
+                                 "must at least be 2: " + \
+                                 "%d" % self.num_procs)
+            
+        elif self.task == 'cond':
+
+            procs_geom  =  "#PBS -l nodes=%d:ppn=%d"  % \
+                          (self.num_nodes, self.cores_per_node)
+            self.num_procs = self.num_nodes * self.cores_per_node
+
+            if self.num_procs < 1:
+                raise Exception ("Number processes of LFM computation "
+                                 "must at least be 2: " + \
+                                 "%d" % self.num_procs)
+            
+        elif self.task == 'for':
+            procs_geom  =  "#PBS -l nodes=1:ppn=1"
+
+        else:
+            raise Exception ("Error: shouln't got here ")
+
+        pbs_in  =  "#!/bin/bash\n"
+        pbs_in +=  procs_geom + "\n"
+        pbs_in +=  "#Join the STDOUT and STDERR streams into STDOUT \n"
+        pbs_in +=  "#PBS -j oe \n"
+        pbs_in +=  "#PBS -o %s \n" % std_outerr_fname
+        pbs_in +=  "#PBS -N %s \n" % job_name
+        pbs_in +=  "#PBS -l walltime=%s:%s:00 \n\n" % (mt_hours, mt_min)
+        pbs_in +=  "export WORK_DIR=%s \n" % self.output_dir
+        pbs_in +=  "cd $WORK_DIR \n"
+        pbs_in +=  "export OMP_NUM_THREADS=%s" % self.omp_num_threads + "\n\n"
+        
+        if self.pbs_modules:
+            pbs_in += "#Initialize and clean Environment Modules\n"
+            pbs_in += ". /usr/local/packages/Modules/current/init/bash\n"
+            pbs_in += "module purge\n"
+            pbs_in += "module load %s \n" % self.pbs_modules
+            pbs_in += "\n"
+
+        if (self.task == 'for'):
+            pbs_in += "%s %s 1>%s 2>&1 \n" % (self.prog_full_path,
+                                              self.prog_arg, log_fname)
+        else:
+            pbs_in += "mpirun %s -np %d %s %s  1>%s 2>&1 \n" % \
+                      (self.mpiarg, self.num_procs, self.prog_full_path, \
+                       self.prog_arg, log_fname)
+
+        fid = open(self.pbs_shell_fname, 'w')
+        fid.write(pbs_in)
+        fid.close()
+        os.system("chmod 755 %s " % self.pbs_shell_fname)
+                
+    def load_pbs_queue(self):
+        clusters = [
+
+            {'name' :'mist', 'queue':'mist_nolimit',
+             'qtime': None,  'gpu': 0, 'maxnodes' : 14,
+             'cpn'  : 8, 'mpiarg': ''},
+            
+            {'name' :'mist', 'queue':'cuda_nolimit',
+             'qtime': None, 'gpu': 6,  'maxnodes' : 4,
+             'cpn'  : 8, 'mpiarg': ''},
+            
+            {'name' :'hn1', 'queue':'generic',
+             'qtime': 24, 'gpu': 0, 'maxnodes' : 90,
+             'cpn'  : 12, 'mpiarg': '--mca btl_tcp_if_include torbr'},
+            
+            {'name' :'hn1', 'queue':'longgen',
+             'qtime': 96,   'gpu': 0, 'maxnodes' : 90,
+             'cpn'  : 12, 'mpiarg': '--mca btl_tcp_if_include torbr'},
+            
+            {'name' :'hn1', 'queue':'xlonggen',
+             'qtime': 360,  'gpu': 0, 'maxnodes' : 90,
+             'cpn'  : 12, 'mpiarg': '--mca btl_tcp_if_include torbr'},
+            
+            {'name' :'hn1', 'queue':'fatnodes',
+             'qtime': 24,   'gpu': 0, 'maxnodes' : 60,
+             'cpn'  : 32, 'mpiarg': '--mca btl_tcp_if_include torbr'},
+            
+            {'name' :'hn1', 'queue':'gpu',
+             'qtime': 24,   'gpu': 3, 'maxnodes' : 52,
+             'cpn'  : 12, 'mpiarg': '--mca btl_tcp_if_include torbr'},
+            
+            {'name' :'frankenstein', 'queue':'',
+             'qtime': None, 'gpu': 4, 'maxnodes': 1,
+             'cpn'  : 16, 'mpiarg': ''}, 
+
+            {'name' :'vampire', 'queue':'',
+             'qtime': None, 'gpu': 4, 'maxnodes': 1,
+             'cpn'  : 16, 'mpiarg': ''} 
+
+
+            ]
+
+        #which cluster I am on
+        wcluster = platform.node().strip().split('.')[0]
+
+        #get all gueues on this cluster 
+        queus = [row  for row in clusters if row['name'] == wcluster];
+
+        if not queus:
+            raise Exception ("Error: undefined cluster: %s " % wcluster)
+
+        gpu_queues = [q for q in queus if q['gpu'] > 0 ]
+        omp_queues = [q for q in queus if q['gpu'] < 1 ]
+        queues = gpu_queues
+        
+        if self.parallelism == 'gpu':
+            if not queues:
+                raise Exception ("Error: no gpu queues on cluster: %s" % \
+                                 wcluster)
+            
+        elif self.parallelism == 'omp':
+            if omp_queues:
+                queues = omp_queues
+
+        # get the queues that meet the time requirement 
+        queues = [ q for q in queues if q['qtime'] >= self.max_time_hour  \
+                   or q['qtime'] is None]
+
+        if not queues:
+            raise Exception ("Error: no queue meets requested time: %f" % \
+                             self.max_time_hour)
+
+        self.queue = queues[0]['queue']
+        qmax_nodes = queues[0]['maxnodes']
+        self.gpus_per_node = queues[0]['gpu']
+        self.cores_per_node = queues[0]['cpn']
+        self.mpiarg         = queues[0]['mpiarg']
+        
+        # adjust requested number of nodes to not exceed the queue limit
+        if qmax_nodes < self.num_nodes:
+            print "Number of nodes exceeded the queue limits ... "\
+                  "adjusted to queue limit "
+            
+            self.num_nodes = qmax_nodes
+            
+        elif 0 > self.num_nodes:
+            print "Number of nodes is zero ... adjusted to one "
+            self.num_nodes = 1
+                
+
+    def load_prog_name(self):
+        paral = self.parallelism
+        if paral == 'gpu':
+            paral = 'cuda'
+            
+        prog_name = "_".join([self.task, paral])
+
+        if prog_name not in ['for_omp', 'for_cuda', 'lfm_omp', 'lfm_cuda',
+                             'cond_omp', 'cond_cuda'] :
+            raise Exception ("Error: unsupported executable %s " % prog_name)
+
+        self.prog_name = prog_name
+        
+
+    def load_params(self):
+
+        lines = open(self.hm_input_file, 'r').readlines()
+        
+        for line in lines:
+            
+            line = line.strip()
+            
+            if line[0:2] == '#:':
+                
+                cmnd_value = line.split()
+                cmnd, value = cmnd_value[1].strip(), cmnd_value[2].strip()
+
+                if cmnd == 'num_nodes':
+                    self.num_nodes = int(value)
+                    if self.num_nodes <= 0:
+                        raise Exception ("Error: too few nodes ")
+
+                elif cmnd == "max_time":
+                    self.max_time_hour = float(value)
+                    if self.max_time_hour <= 0:
+                        raise Exception ("Error: too short time ")
+
+                elif cmnd == "task":
+                    self.task = value
+                    
+                elif cmnd == "parallelism":
+                    self.parallelism = value
+
+                elif cmnd == "output_name_prefix":
+                    self.output_name_prefix = value
+
+                else:
+                    raise Exception ("Error: unrecognized comand: % s" % cmnd)
+                    
+            elif line == "" or line[0] == '#':
+                continue
+                
+            else :
+                l = line.split()
+                if len(l) == 2:
+                    cmnd, value = l[0], l[1]
+                    if cmnd == 'output_name_prefix':
+                        self.output_name_prefix = value;
+        
+    def run(self):
+        
+        if self.queue:
+            
+            runstring = "qsub -q %s %s" % (self.queue, self.pbs_shell_fname)
+            print("Executing command:\n %s\n" % runstring)
+            status = os.system(runstring)
+            if status:
+                raise Exception("failed to submit the job %d " % status)
+        else:
+            try:
+
+                command = "./%s " % self.pbs_shell_fname
+                p = subprocess.check_call(command, stdout=subprocess.PIPE,
+                                          stderr=subprocess.PIPE, shell=True)
+                
+            except Exception, e:
+                print "Failed"
+                print e
+                print
+                
+        
+
+#############################################################
+
+def run_samples(mode) :
+    
+    import time
+    hm_home = os.getenv("HEAD_MODELING_HOME")
+
+    if hm_home == None:
+        
+        print >> sys.stderr, "Error: undefined environment variable " \
+              "HEAD_MODELING_HOME"
+        exit(1)
+
+    if mode == '-test':
+        input_path   = os.path.join(hm_home, 'test/input')
+        output_path  = os.path.join(hm_home, 'test/solution')
+
+    elif mode == '-ver':
+        input_path   = os.path.join(hm_home, 'ver/input')
+        output_path  = os.path.join(hm_home, 'ver/solution')
+
+    else:
+        raise Exception("unrecognized test mode %s " % mode)
+    
+    cwd  = os.getcwd()
+        
+    
+    hmfiles = [
+
+#        'sph_hm_adiompiso_100.hm',
+#        'sph_hm_adicudaiso_100.hm',
+#        'sph_hm_vaiompiso_100.hm',
+#         'sph_hm_vaicudaiso_100.hm',
+#        'sph_hm_vaiompani_100.hm',
+#        'sph_hm_vaicudaani_100.hm',
+#        'sph_hm_adiompiso_eit_200.hm',
+#        'sph_hm_adicudaiso_eit_200.hm',
+#        'sph_hm_vaiompiso_eit_200.hm',
+#        'sph_hm_vaicudaiso_eit_200.hm',
+#        'sph_hm_vaicudaani_200.hm',
+#        'sph_hm_vaiompani_200.hm',
+#        'pl_bk_adicudaiso_1mm.hm',
+#        'pl_bk_adiompiso_1mm.hm',
+#        'pl_bk_vaicudaiso_1mm.hm',
+#        'pl_bk_vaiompiso_1mm.hm',
+#        'ch_bk_adicudaiso_lfmtriprec_6d_1mm.hm', #lfm small
+#        'ch_bk_adicudaiso_lfmtripfor_6d_1mm.hm',
+#        'ch_bk_vaicudaiso_lfmtriprec_6d_1mm.hm',
+#        'ch_bk_vaicudaiso_lfmtripfor_6d_1mm.hm',
+#        'ch_bk_adicudaiso_lfmtriprec_6d_endiann_1mm.hm',
+
+        'ch_bk_adicudaiso_condsa_simulated_2mm.hm', #cond
+        'ch_bk_adicudaiso_condsim_simulated_2mm.hm',
+        'ch_bk_vaicudaiso_condsa_simulated_2mm.hm',
+        'ch_bk_vaicudaiso_condsim_simulated_2mm.hm',
+        'ch_bk_vaicudaani_condsa_simulated_2mm.hm',
+        'ch_bk_vaicudaani_condsim_simulated_2mm.hm',
+
+#        'pl_bmd_adicudaiso_condsa_simulated_1mm_bmd.hm',
+#        'pl_bmd_adicudaiso_condsim_simulated_1mm_bmd.hm',
+#        'pl_bmd_adicudaiso_condsa_simulated_1mm_uni.hm',
+#        'pl_bmd_adicudaiso_condsim_simulated_1mm_uni.hm',
+
+        ]
+
+    os.chdir( output_path )
+    timeAmount = 1
+    
+    for hmfile in hmfiles:
+
+        hmfile_path = os.path.join(input_path, hmfile)
+        print "Processing file: %s ... " % hmfile,
+        sys.stdout.flush()
+
+        try:
+            lf = HMtools(hmfile_path)
+            print "ok "
+
+        except Exception, e:
+            print "Failed"
+            print e
+            print
+        
+            sys.stdout.flush()
+            time.sleep(timeAmount)
+    os.chdir(cwd)
+     
+if __name__ == "__main__":
+    
+    if len(sys.argv) < 2:
+        print "No description file specified "
+
+    elif sys.argv[1] in ['-test', '-ver']:
+        try:
+            run_samples(sys.argv[1])
+        except Exception, e:
+            print e
+
+    else:
+        try:
+            print "Processing file: %s ... " % os.path.split(sys.argv[1])[1],
+            sys.stdout.flush()
+            lf = HMtools(sys.argv[1])
+            print "ok"
+            sys.stdout.flush()
+        except Exception, e:
+            print "Failed"
+            print e
+
+        

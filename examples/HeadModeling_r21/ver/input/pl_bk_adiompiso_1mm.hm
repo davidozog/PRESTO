@@ -1,0 +1,37 @@
+#################################################################
+##    Test Forward solver                             ###########
+#################################################################
+#: task                         for
+#: parallelism                  omp
+#: max_time                     20
+#: output_name_prefix           pl_bk_adiompiso_1mm
+
+datapath                data/
+braink_data_dir         test_lfm_pl364
+data_set_kind           atlas_trip_CT
+
+#specify the algorithm  [adi | vai] and parallelism [omp | cuda] 
+algorithm               adi
+parallelism             omp
+
+convergence_check        50
+conv_eps                .00001;
+
+# output name 
+output_name_prefix      pl_bk_adiompiso_1mm
+
+################ Forward solver parameters 
+time_step               2.5
+tol                     0.0001
+max_iter                2000
+
+tissues                 air   wm   skull  scalp  csf    gm    iair 
+tissues_conds           0.0  .35    .018  .44    1.79   .25   0.0  
+tang_to_normal_ration    1
+
+
+current                 100
+current_src             4
+current_sink            12
+
+solution               sensors
