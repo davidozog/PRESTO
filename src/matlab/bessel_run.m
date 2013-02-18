@@ -1,5 +1,6 @@
-N = 1000000;
+N = 90;
 a = linspace(0,1,N);
+b = 3;
 
 %b = zeros(1,N);
 
@@ -7,9 +8,9 @@ a = linspace(0,1,N);
 %  b(i) = bessel_test( a(i) );
 %end
 
-[b c] = send_jobs_to_workers('bessel_test', 'TMPFS', {'a'}, {}, true);
+[c d] = send_jobs_to_workers('bessel_test', 'TMPFS', {'a'}, {'b'}, true, true, 10);
 
 
-b(1)
-b(2)
-b(N)
+c(1)
+c(2)
+c(N)
