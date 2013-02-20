@@ -1,0 +1,129 @@
+#!/usr/bin/env python
+
+import os
+import sys
+
+# Example Usages:
+#  python get_free_nodes.py gpu
+#  python get_free_nodes.py fatnodes
+#  python get_free_nodes.py generic
+#  python get_free_nodes.py any
+#  python get_free_nodes.py  (get's all free nodes)
+
+def analyze_node(nodeName, attributes, node_type):
+
+  #print 'nodeName:' + nodeName
+  if nodeName == 'gn1\n':
+    import pdb; pdb.set_trace()
+  state = attributes['state']
+
+  if state == 'free':
+    try:
+      jobs = attributes['jobs']
+      freeNode = False
+    except:
+      freeNode = True
+  else:
+    freeNode = False
+
+  if freeNode:
+    properties = attributes['properties']
+    node_types = properties.split(',')
+
+    try:
+      if node_types.index('generic'):
+        genNode = 1 
+    except ValueError:
+      genNode = 0
+
+    try:
+      if node_types.index('mpi'):
+        mpiNode = 1 
+    except ValueError:
+      mpiNode = 0
+
+    try:
+      if node_types.index('fatnodes'):
+        fatNode = 1 
+    except ValueError:
+      fatNode = 0
+    
+    try:
+      if node_types.index('gpunodes'):
+        gpuNode = 1 
+    except ValueError:
+      gpuNode = 0
+
+    try:
+      if node_types.index('longgen'):
+        longgenNode = 1 
+    except ValueError:
+      longgenNode = 0
+
+    try:
+      if node_types.index('longgpu'):
+        if nodeName != 'cn26':
+          longgpuNode = 1 
+        else:
+          longgpuNode = 0 
+    except ValueError:
+        longgpuNode = 0
+
+    if freeNode:
+      if node_type == 'gpu' and gpuNode: 
+        print nodeName
+      elif node_type == 'gpuonly' and gpuNode and not longgpuNode:
+        print nodeName
+      elif node_type == 'longgen' and longgenNode:
+        print nodeName
+      elif node_type == 'longgpu' and longgpuNode:
+        print nodeName
+      elif node_type == 'fatnodes' and fatNode:
+        print nodeName
+      elif node_type == 'generic' and genNode:
+        print nodeName
+      elif node_type == 'mpi' and mpiNode:
+        print nodeName
+      elif node_type == 'any':
+        print nodeName
+
+
+# If there's a command line argument, set it.  Otherwise, set to 'any'
+try:
+  if sys.argv[1]:
+    node_type = sys.argv[1]
+except:
+  node_type = 'any'
+
+os.system("pbsnodes -a > nodesfile.txt")
+f = open("nodesfile.txt", "r")
+freeNode = True
+gpuNode = 0
+fatNode = 0
+genNode = 0
+mpiNode = 0
+longgenNode = 0
+longgpuNode = 0
+longfatNode = 0
+
+node = []
+attrs = {}
+state = 'free'
+
+for line in f.readlines():
+  if len(line) > 1:
+    if line[0] != ' ' and line[0] != '\n':
+      if len(node) == 0:
+        node.append(line.strip())
+      else:
+        analyze_node(node.pop(), attrs, node_type)
+        attrs.clear()
+        node.append(line.strip())
+    else:
+      split = line.split(' = ')
+      attrs[split[0].strip()] = split[1].strip()
+
+f.close()
+os.system('rm nodesfile.txt')
+
+
