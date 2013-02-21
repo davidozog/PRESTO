@@ -333,7 +333,9 @@ else:
   #p = subprocess.Popen(args, stdout=subprocess.PIPE)
 
   if interface == 'matlab':
-    cmd = MATLAB_BIN + ' -nosplash -r "mworker(\''+name+'\', '+srank+')" -nodesktop'
+    presto_dir = os.environ['PRESTO']
+    presto_mpath = os.path.join(presto_dir, 'presto_setpath.m')
+    cmd = MATLAB_BIN + ' -nosplash -r "run ' + presto_mpath + '; mworker(\''+name+'\', '+srank+')" -nodesktop'
   elif interface == 'java':
     cmd = "java Worker " + name + " " + srank
   if(DEBUG):print "cmd is: " + cmd

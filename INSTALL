@@ -13,21 +13,36 @@ please use the default python version by running:
   
   Then add PRESTO to your path:
     export PATH=$PATH:$PRESTO/bin
+
+
+2) MATLAB SETUP:
+
+  You can add PRESTO to your path in 1 of 2 ways, 
+  depending on your preference:
   
-  If it does not already exist, create a Matlab startup file:
-    mkdir -p ~/Documents/MATLAB
-    vi ~/Documents/MATLAB/startup.m
-  
-  and append these lines to the startup.m file:
-    % PRESTO:
-    if isempty( getenv( 'PRESTO' ) ) 
-    	display('Please set the PRESTO environment variable' );
-    else
-    	addpath( [getenv( 'PRESTO' ) , 'src/matlab'] );
-    end
+  --> Via a Matlab startup script:
+
+      If it does not already exist, create a Matlab startup file:
+        mkdir -p ~/Documents/MATLAB
+        vi ~/Documents/MATLAB/startup.m
+      
+      and append these lines to the startup.m file:
+        % PRESTO:
+        if isempty( getenv( 'PRESTO' ) ) 
+        	display('Please set the PRESTO environment variable' );
+        else
+        	addpath( [getenv( 'PRESTO' ) , 'src/matlab'] );
+        end
+
+  or 
+
+  --> By running the following command in Matlab when you want to use PRESTO:
+
+        run /path/to/pesto/root/pesto_setpath.m
+
   
 
-2) JAVA SETUP:
+3) JAVA SETUP:
 
   If you plan on using Java adaptors, then you will need to add the following
   to your CLASSPATH environment variable:
@@ -35,7 +50,7 @@ please use the default python version by running:
     export CLASSPATH=$CLASSPATH:$PRESTO/src/Java
 
 
-3) TEST INSTALLATION: 
+4) TEST INSTALLATION: 
 
   Refer to the PRESTO README file to see how to test the installation.
 
