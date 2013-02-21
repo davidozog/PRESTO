@@ -1,24 +1,29 @@
 INSTALLATION
 ============
+PRESTO requires python version 2.7 or higher.  On the Aciss cluster,
+please use the default python version by running:
+
+    module load python
+
 
 1) ENVIRONMENT SETUP:
 
-  To set up the PESTO environment variable in bash: 
-    export PESTO=</path/to/your/pesto/directory/>
+  To set up the PRESTO environment variable in bash: 
+    export PRESTO=</path/to/your/presto/directory/>
   
-  Then add PESTO to your path:
-    export PATH=$PATH:$PESTO/bin
+  Then add PRESTO to your path:
+    export PATH=$PATH:$PRESTO/bin
   
   If it does not already exist, create a Matlab startup file:
     mkdir -p ~/Documents/MATLAB
     vi ~/Documents/MATLAB/startup.m
   
   and append these lines to the startup.m file:
-    % PESTO:
-    if isempty( getenv( 'PESTO' ) ) 
-    	display('Please set the PESTO environment variable' );
+    % PRESTO:
+    if isempty( getenv( 'PRESTO' ) ) 
+    	display('Please set the PRESTO environment variable' );
     else
-    	addpath( [getenv( 'PESTO' ) , 'src/matlab'] );
+    	addpath( [getenv( 'PRESTO' ) , 'src/matlab'] );
     end
   
 
@@ -27,10 +32,10 @@ INSTALLATION
   If you plan on using Java adaptors, then you will need to add the following
   to your CLASSPATH environment variable:
 
-    export CLASSPATH=$CLASSPATH:$PESTO/src/Java
+    export CLASSPATH=$CLASSPATH:$PRESTO/src/Java
 
 
 3) TEST INSTALLATION: 
 
-  Refer to the PESTO README file to see how to test the installation.
+  Refer to the PRESTO README file to see how to test the installation.
 

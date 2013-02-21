@@ -13,7 +13,7 @@ import sysv_ipc
 import mmap
 import shmemUtils
 
-DEBUG = False
+DEBUG = True
 
 #MATLAB_BIN = '/usr/local/packages/MATLAB/R2011b/bin/matlab'
 MATLAB_BIN = os.environ['MATLAB'] + '/bin/matlab'
@@ -27,6 +27,8 @@ MASTER_PORT = 11112
 
 JQKEY = 37408
 RQKEY = 48963
+
+TMPFS_PATH = '/dev/shm/'
 
 # Set to True if using "NETWORK" mode
 messageQueue = False
@@ -86,6 +88,16 @@ def worker_shmem_initiailization():
   except:
     pass
 
+# Get the user id for the file objects
+def get_uid():
+  uid = subprocess.check_output('id')
+  uid = uid.split()[0]
+  lft = uid.index('=') + 1
+  rht = uid.index('(')
+  uid = uid[lft:rht]
+  return uid
+
+
 # Initialize mpi4py:
 mpiComm = MPI.COMM_WORLD
 size = mpiComm.Get_size()
@@ -114,6 +126,10 @@ if (rank==0):
 
   q = Queue()
   if interface == 'matlab':
+    print 'sysv is:' + str(len(sys.argv))
+    if len(sys.argv) == 3:
+      worker_dict = worker_dict + ';' + sys.argv[2]
+      print 'worker_dict:' + worker_dict
     t = threading.Thread(target=launch_matlab, args=(q, worker_dict))
   elif interface == 'java':
     java_app = sys.argv[2]
@@ -162,7 +178,7 @@ if (rank==0):
             mesg = mesg_q.get() + '\n'
             fromq = True
           else:
-            mesg = cnn.recv(4096)
+            mesg = cnn.recv(8192)
             fromq = False
           # why is 'filter' here?  
           mesg_split = filter(None, mesg.split('\n'))
@@ -175,6 +191,7 @@ if (rank==0):
           if (len(mesg) > 0):
             if(DEBUG):print '     master message is ' + mesg 
             if mesg == 'done\n' or mesg == 'kill\n':
+              #TODO: reset 'persistent' flag here, I think
               break
             protocol = mesg.split(',')[1].strip()
             if protocol == 'NETWORK':
@@ -185,14 +202,13 @@ if (rank==0):
               mesg = mesg.strip() + ':' + mesg_dat + '\n'
 
             if protocol == 'TMPFS':
+              uid = get_uid()
               if(DEBUG):print 'TMPFS msg is ' + mesg.split(',')[3].strip()
               tmpfs_file = open(mesg.split(',')[3].strip(), 'rb')
               mesg_dat = tmpfs_file.read()
-              tmpfs_file_shared = open('/dev/shm/.jshared.mat', 'rb')
-              mesg_dat_shared = tmpfs_file_shared.read()
-              mesg = mesg.strip() + ':::::' + mesg_dat + ':::::' + mesg_dat_shared + '\n'
+              # TODO: Just broadcast shared data once per job pool...
+              # TODO: And/or add flag to use persistent shared data on worker side
               tmpfs_file.close()
-              tmpfs_file_shared.close()
                 
 
             # Determine the rank of the next worker:
@@ -226,21 +242,31 @@ if (rank==0):
                 rq.send(mesg_data, type=mesg_jobid)
 
               elif protocol == 'TMPFS':
-                TMPFS_PATH = '/dev/shm/'
                 jobid = data[:data.find(':')]
                 print '   JOBID: ' + jobid + ' FINISHED'
-                results_file = open(TMPFS_PATH + '.results_' + jobid + '.mat', 'wb')
+                results_file = open(TMPFS_PATH +'.'+ uid + '_r' + jobid + '.mat', 'wb')
                 results_file.write(data[data.find(':')+1:])
                 results_file.close()
                 cnn.sendall(results_file.name + '\n')
+                #TODO: make sure mesg doesn't contain shared data, and 
+                #      transmits 'persist' or something like that
       
               else:
                 cnn.sendall(data)
+
+              mesg = mesg.strip() + ':::::' + mesg_dat + ':::::persist\n'
 
               mpiComm.send(mesg, dest=master_status.source, tag=DO_WORK_TAG)
               running_jobs.append(master_status.source)
               master_status = MPI.Status()
             else:
+              #TODO: move TMPFS shared data load and send to here:
+              tmpfs_filepath_shared = TMPFS_PATH + '.' + uid + '_sh.mat'
+              tmpfs_file_shared = open(tmpfs_filepath_shared, 'rb')
+              mesg_dat_shared = tmpfs_file_shared.read()
+              mesg = mesg.strip() + ':::::' + mesg_dat + ':::::' + mesg_dat_shared + '\n'
+              tmpfs_file_shared.close()
+
               mpiComm.send(mesg, dest=destination, tag=DO_WORK_TAG)
               running_jobs.append(destination)
           else:
@@ -251,7 +277,8 @@ if (rank==0):
           print str(len(running_jobs)) + ' JOBS ARE RUNNING'
           if(DEBUG): print 'master waiting for results...'
           data = mpiComm.recv(source=MPI.ANY_SOURCE, tag=RESULTS_TAG, status=master_status)
-          if(DEBUG):print 'GOT RESULT:' + data
+          #if(DEBUG):print 'GOT RESULT:' + data
+          if(DEBUG):print 'GOT RESULT'
           running_jobs.remove(master_status.source)
           master_status = MPI.Status()
 
@@ -265,10 +292,9 @@ if (rank==0):
             rq.send(mesg_data, type=mesg_jobid)
 
           elif protocol == 'TMPFS':
-            TMPFS_PATH = '/dev/shm/'
             jobid = data[:data.find(':')]
             print '   JOBID: ' + jobid + ' FINISHED'
-            results_file = open(TMPFS_PATH + '.results_' + jobid + '.mat', 'wb')
+            results_file = open(TMPFS_PATH + '.' + uid + '_r' + jobid + '.mat', 'wb')
             results_file.write(data[data.find(':')+1:])
             results_file.close()
             cnn.sendall(results_file.name + '\n')
@@ -320,12 +346,12 @@ else:
   s.listen(1)
   conn, addr = s.accept()
   print 'Worker connected: ', addr
-  alive = conn.recv(4096)
+  alive = conn.recv(512)
   kill = None
 
   worker_shmem_initiailization()
-  memory = posix_ipc.SharedMemory('SHM2MAT', posix_ipc.O_CREX, size=4096)
-  semaphore = posix_ipc.Semaphore('PYSEM', posix_ipc.O_CREX)
+  #memory = posix_ipc.SharedMemory('SHM2MAT', posix_ipc.O_CREX, size=8192)
+  #semaphore = posix_ipc.Semaphore('PYSEM', posix_ipc.O_CREX)
 
   # Wait for a message from the Master to do work
   while (kill != 1):
@@ -351,13 +377,21 @@ else:
       elif protocol == 'TMPFS':
         worker_tmpfs_file = open(mesg.split(',')[3].strip(), 'wb')
         mesg_data_split = mesg.split(':::::')
-        #worker_tmpfs_file.write(mesg[mesg.find(':')+1:])
+        mesg = mesg.split(':')[0]
         worker_tmpfs_file.write(mesg_data_split[1])
         worker_tmpfs_file.close()
-        worker_tmpfs_file_shared = open('/dev/shm/.jshared.mat', 'wb')
-        worker_tmpfs_file_shared.write(mesg_data_split[2])
-        worker_tmpfs_file_shared.close()
-        mesg = mesg.split(':')[0]
+        if mesg_data_split[2] != 'persist\n':
+          uid = get_uid()
+          worker_tmpfs_filepath_shared = TMPFS_PATH + '.' + uid + '_sh.mat'
+          worker_tmpfs_file_shared = open(worker_tmpfs_filepath_shared, 'wb')
+          if mesg_data_split[2][0] == ':':
+            # This is just a fix to a weird bug:
+            worker_tmpfs_file_shared.write(mesg_data_split[2][1:])
+          else:
+            worker_tmpfs_file_shared.write(mesg_data_split[2])
+          worker_tmpfs_file_shared.close()
+        else:
+          mesg = mesg + ", persist"  
         mesg = mesg + '\n'
         conn.sendall(mesg)
         
@@ -367,42 +401,46 @@ else:
 
 
       # Wait for results (filename):
-      data = conn.recv(4096)
-      if(DEBUG):print 'W'+srank+':(finished/received): ' + data
+      data = conn.recv(512)
+      if(DEBUG):print 'W'+srank+':(finished/received): ' + data 
+      if len(data.strip()) > 1:
 
-      if protocol == 'NETWORK':
-        while True:
-          try:
-            semaphore = posix_ipc.Semaphore('MATSEM')
-            break
-          except:
-            #time.sleep(1)
-            continue
-        mesg_len = int(data.split(':')[-2])
-        jobid = int(data.split(':')[-1])
-        semaphore.acquire()
-        memory = posix_ipc.SharedMemory('MAT2SHM')
-        mapfile = mmap.mmap(memory.fd, memory.size)
-        os.close(memory.fd)
-        shm_data = shmemUtils.read_from_memory(mapfile, mesg_len)
-        semaphore.release()
-        data = data.strip() + ':' + shm_data
+        if protocol == 'NETWORK':
+          while True:
+            try:
+              semaphore = posix_ipc.Semaphore('MATSEM')
+              break
+            except:
+              #time.sleep(1)
+              continue
+          mesg_len = int(data.split(':')[-2])
+          jobid = int(data.split(':')[-1])
+          semaphore.acquire()
+          memory = posix_ipc.SharedMemory('MAT2SHM')
+          mapfile = mmap.mmap(memory.fd, memory.size)
+          os.close(memory.fd)
+          shm_data = shmemUtils.read_from_memory(mapfile, mesg_len)
+          semaphore.release()
+          data = data.strip() + ':' + shm_data
 
-      elif protocol == 'TMPFS':
-        if(DEBUG): print 'results file is' + data
-        results_file = open(data.strip(), 'rb')
-        idx = data.find('_')
-        jobid = data[idx+1:data.find('.',idx+1)]
-        data = jobid + ':' + results_file.read()
+        elif protocol == 'TMPFS':
+          if(DEBUG): print 'results file is' + data
+          results_file = open(data.strip(), 'rb')
+          idx = data.find('r')
+          jobid = data[idx+1:data.find('.',idx+1)]
+          data = jobid + ':' + results_file.read()
 
-      # Send results (filename) back to master:
-      mpiComm.send(data, dest=0, tag=RESULTS_TAG)
+        # Send results (filename) back to master:
+        mpiComm.send(data, dest=0, tag=RESULTS_TAG)
 
-      # See if the master has decided to die:
-      #mpiComm.Iprobe(source=0, tag=KILL_TAG, status=worker_status)
-      #if (worker_status.tag == KILL_TAG):
-      #  if(DEBUG):print 'KILL MESSAGE came from ' + str(worker_status.source)
-      #  kill = mpiComm.recv(source=worker_status.source, tag=worker_status.tag)
+        # See if the master has decided to die:
+        #mpiComm.Iprobe(source=0, tag=KILL_TAG, status=worker_status)
+        #if (worker_status.tag == KILL_TAG):
+        #  if(DEBUG):print 'KILL MESSAGE came from ' + str(worker_status.source)
+        #  kill = mpiComm.recv(source=worker_status.source, tag=worker_status.tag)
+      else:
+        continue
+
     elif (worker_status.tag == KILL_TAG):
       if protocol == 'NETWORK':
         semaphore.acquire()

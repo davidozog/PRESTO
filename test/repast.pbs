@@ -1,12 +1,12 @@
 #!/bin/bash
-PBS -N repast
-PBS -q generic
-PBS -l nodes=1:ppn=6
-PBS -l walltime=24:00:00
-PBS -d /home11/ozog_geo
-PBS -o /home11/ozog_geo/log
-PBS -e /home11/ozog_geo/log
-PBS -j oe
+#PBS -N repast
+#PBS -q generic
+#PBS -l nodes=1:ppn=6
+#PBS -l walltime=24:00:00
+#PBS -d /home0/maltaweel_geo
+#PBS -o /home0/maltaweel_geo/log
+#PBS -e /home0/maltaweel_geo/log
+#PBS -j oe
 #PBS -m e
 
 cd $PBS_O_WORKDIR
@@ -23,7 +23,7 @@ echo "Total lines: $lines"
 np=`wc -l < $PBS_NODEFILE`
 echo "Total processing nodes: $np"
 
-let "remaining_instances = ($lines + $run_per_instance - 1) /  $run_per_instanc$
+let "remaining_instances = ($lines + $run_per_instance - 1) /  $run_per_instance"
 
 count=0
 while (( $remaining_instances > 0 ))
@@ -32,8 +32,8 @@ do
         then
         np=$remaining_instances
     fi
-    pbsdsh -c $np $PBS_O_WORKDIR/repastwrapper.sh $lines $run_per_instance $cou$
+    pbsdsh -c $np $PBS_O_WORKDIR/repastwrapper.sh $lines $run_per_instance $count $f
     count=$(( $count + $np ))
     let remaining_instances=$remaining_instances-$np
-done   
+done
 echo "Completed all runs."

@@ -2,47 +2,52 @@
 import subprocess
 import sys
 import os
-
-count = False
-init = False
-try:
-  arg1 = sys.argv[1]
-  if arg1 == 'count':
-    count = True
-  elif arg1 == 'init':
-    init = True
-    num_nodes = 8
-  else:
-    num_nodes = int(sys.argv[1])
-except:
-  sys.exit('ERROR: Need to know how many nodes you want (or "count" the nodes).')
+import argparse
 
 
+# Parse arguments:
+parser = argparse.ArgumentParser(description='Launch an interactive PBS job.')
+parser.add_argument('-n', metavar='N', type=int, default=2,
+                     help='the total number of nodes in the job')
+parser.add_argument('--count', action='store_true', default=False,
+                     help='if true count the number of available nodes')
+parser.add_argument('--enable-display', action='store_true', default=False,
+                     help='if true do X forwarding (so GUI can launch)')
+args = parser.parse_args()
+
+
+# Find free nodes (TODO make a python module for this):
 command = 'get_free_nodes generic'
 out = subprocess.check_output(command, shell=True)
 out = out.split()
-
-if count:
+if args.count:
   print len(out)
-  sys.exit()
-elif init:
-  print 'Initiating PESTO speed test'
-  rinth_path = os.environ['PESTO'] + 'examples/init_test/'
-  qsub_command = 'qsub -q generic ' + rinth_path + \
-                 'init_test.sh -d $PWD -l walltime=24:00:00 -l nodes='
-else:	
+  sys.exit(0)
+
+
+# Create hostsfile and qsub command
+elif not args.enable_display:	
+  qsub_command = 'qsub -q generic -I -d $PWD -l walltime=24:00:00 -l nodes='
+else:
   qsub_command = 'qsub -q generic -I -X -d $PWD -l walltime=24:00:00 -l nodes='
 
-notification = 'selecting nodes: '
-for nodename in out[:num_nodes]:
-  qsub_command += nodename + ':ppn=1+'
-  notification += nodename + ', '
+presto_config_path = os.path.join(os.environ['HOME'], '.presto')
+if not os.path.exists(presto_config_path):
+  os.makedirs(presto_config_path)
+hostsfile = open(os.path.join(presto_config_path, 'presto_hosts'), 'w')
 
+notification = 'selecting nodes: '
+for nodename in out[:args.n]:
+  qsub_command += nodename + ':ppn=12+'
+  notification += nodename + ', '
+  hostsfile.write(nodename + ' max_slots=1\n')
+
+hostsfile.close()
 qsub_command = qsub_command[:-1]
 notification = notification[:-2]
 
+
+# Launch PBS job:
 print notification
-
 print qsub_command
-
 launch_stat = subprocess.call(qsub_command, shell=True)

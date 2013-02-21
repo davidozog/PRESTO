@@ -1,6 +1,7 @@
 function mworker(my_hostname, rank)
 
-  DEBUG = 0;
+  DEBUG = 1;
+  TMPFS_PATH = '/dev/shm/';
 
   % Set up a custom directory for the PCT
   %hostname = getenv('HOSTNAME');
@@ -8,6 +9,13 @@ function mworker(my_hostname, rank)
   hostpool = sprintf( '%s/.matlab/local_scheduler_data/R2011b/%s' ,home, my_hostname);
   sch = findResource('scheduler','type','local');
   set(sch, 'DataLocation', hostpool);
+
+  % Get user id for saving file objects:
+  [status, uid] = system('id');
+  [uid, remain] = strtok(uid, ' ');
+  lfteq = strfind(uid, '=') + 1;
+  rtparen = strfind(uid, '(') - 1;
+  uid = uid(lfteq:rtparen);
 
   import java.io.*;
   import java.net.*;
@@ -62,20 +70,22 @@ function mworker(my_hostname, rank)
       [token, remain] = strtok(arg_files, ',');
       split_file = strtrim(token)
       if(DEBUG); fprintf(2, ['split_file is ',  split_file, '\n']); end
-      tmpfs_shared_file = '/dev/shm/.jshared.mat';
+      tmpfs_shared_file = [TMPFS_PATH, '.', uid, '_sh.mat'];
       if(DEBUG); fprintf(2, ['shared_file is ',  tmpfs_shared_file, '\n']); end
       sf = strfind(remain, ',');
       shared_file = strtrim(remain(sf+1:end))
       sf = strfind(shared_file, ',')
       if sf
         shared_file = strtrim(shared_file(1:sf-1))
-        parmode = true
+        persist = true 
+      else 
+        persist = false
       end  
 
 
       % If protocol is shmem/network, get the data:
       if strcmp(proto, 'NETWORK')
-        yrinth_str = 'm_a_t_l_a_b__y_r_i_n_t_h_';
+        yrinth_str = 'p_r_e_s_t_o_';
         [token, remain] = strtok(remain, ':');
         shmem_size = strtrim(token)
         if(DEBUG); fprintf(2, ['\n Calling shmem2mat.c with shmem_size: ', shmem_size , '\n']); end
@@ -104,14 +114,19 @@ function mworker(my_hostname, rank)
 
       % TMPFS protocol:
       elseif strcmp(proto, 'TMPFS')
-        TMPFS_PATH = '/dev/shm/';
-        yrinth_str = 'm_a_t_l_a_b__y_r_i_n_t_h_';
-        yrinth_str_shared = 'm_a_t_l_a_b__y_r_i_n_t_h_sh_';
-        evalin('base', ['clear; load(''',split_file,''')']);
-        evalin('base', 'W = whos');
-        %  I think there's a bug here.  Need a good way to get the number of args:
-        num_objs = evalin('base', 'length(W)');
-        evalin('base', ['load(''',tmpfs_shared_file,''')']);
+        yrinth_str = 'p_r_e_s_t_o_';
+        yrinth_str_shared = 'p_r_e_s_t_o_sh_';
+        if ~persist
+          evalin('base', ['clear; load(''',split_file,''')']);
+          evalin('base', 'W = whos');
+          %  There might be a bug here.  Need a better way to get the number of args:
+          num_objs = evalin('base', 'length(W)');
+          evalin('base', ['load(''',tmpfs_shared_file,''')']);
+        else
+          % If shared data persists, need to subtract it from the length(W)
+          evalin('base', ['load(''',split_file,''')']);
+        end
+
         % This should be cleaned up:
         num_objs_shared = str2num(shared_file);
         % Place objects in workspace:
@@ -133,7 +148,7 @@ function mworker(my_hostname, rank)
       if(DEBUG); fprintf(2, horzcat('Leaving\n')); end
 
         % write results to file and pass path to master
-        results_file = [TMPFS_PATH, '.results_', jobid, '.mat'];
+        results_file = [TMPFS_PATH, '.', uid, '_r', jobid, '.mat'];
         save(results_file, 'ret1', 'ret2');
         out.println(results_file);
         system(['rm ', split_file, ' ', results_file]);
@@ -155,3 +170,5 @@ function mworker(my_hostname, rank)
     end
 
     matlabpool close
+    system(['rm ', TMPFS_PATH, '.', uid, '*']);
+    exit

@@ -7,15 +7,15 @@ function [A0_sub tlMisfit_sub] = Rinth_testfunc_P(aStation, tlMisfit_sub, srMode
 
   shared2
   aStation 
-  aStation(1)
-  aStation(1:5)
+  %aStation(1)
+  %aStation(1:5)
   tlMisfit_sub
   who
 
   srModel = srModel;
   myStations = aStation
   
-  parfor i=1:5
+  parfor i=1:length(aStation)
 
     station = str2num(char(myStations(i)));
     A0_sub(i).A0 = [station station; station station] + srModel;

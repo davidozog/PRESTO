@@ -1,0 +1,45 @@
+#!/usr/bin/env python
+import sys
+import subprocess
+import os
+import argparse
+
+home_dir = os.environ['HOME']
+presto_dir = os.environ['PRESTO']
+presto_hostfile = os.path.join(home_dir, '.presto/presto_hosts')
+num_hosts = subprocess.check_output('wc -l ' + presto_hostfile, shell=True)
+num_hosts = num_hosts.split()[0]
+
+# Parse arguments:
+parser = argparse.ArgumentParser(description='Launch PRESTO', argument_default=argparse.SUPPRESS)
+parser.add_argument('--n', metavar='N', type=str, default=num_hosts,
+                     help='the total number of nodes in the job')
+parser.add_argument('--engine', metavar='ENGINE', type=str, default='matlab',
+                     help='the type of computational engine to run on workers')
+parser.add_argument('--app', metavar='APPNAME', type=str, default='',
+                     help='the name of the application to run (typically, a .m or .class file)')
+parser.add_argument('--hostfile', metavar='file', 
+                     default=presto_hostfile, type=argparse.FileType('r'),
+                     help='MPI hostfile containing list of hostnames')
+
+parser._parse_known_args(sys.argv[1:], argparse.Namespace())
+try:
+  args = parser.parse_args()
+except:
+  sys.stderr.write('Missing a Presto hostfile. Maybe you forgot the "interactive_job" command? (see README)\n')
+  sys.exit(-1)
+
+if args.engine == 'matlab':
+  # TODO: remove .m extension if there
+  pyargs = args.engine + ' ' + args.app
+  print pyargs
+elif args.engine == 'java':
+  # TODO: remove .class extension if there
+  pyargs = args.engine + ' ' + args.app
+else:
+  sys.stderr.write('Unrecognized computational engine\n')
+
+subprocess.call('module load python matlab mpi-tor/openmpi-1.4.5_gcc-4.4.6; source ' \
+                 + '/home11/ozog/usr/python/bin/activate; mpiexec --hostfile ' \
+                 + presto_hostfile + ' --mca btl_tcp_if_include torbr ' + '-n ' + args.n + ' python ' \
+                 + presto_dir + '/src/PRESTO/PRESTO.py ' + pyargs, shell=True)

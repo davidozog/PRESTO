@@ -132,7 +132,7 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
   % MODE 3:
   if mode==3
 
-    yrinth_str = 'm_a_t_l_a_b__y_r_i_n_t_h_';
+    yrinth_str = 'p_r_e_s_t_o_';
 
     if parmode
       error('PCT mode not supported with shared memory implementation');
@@ -178,8 +178,15 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
 
   % MODE 4:
   if mode==4
-    yrinth_str = 'm_a_t_l_a_b__y_r_i_n_t_h_';
-    yrinth_str_shared = 'm_a_t_l_a_b__y_r_i_n_t_h_sh_';
+    % Get user id for saving file objects:
+    [status, uid] = system('id');
+    [uid, remain] = strtok(uid, ' ');
+    lfteq = strfind(uid, '=') + 1;
+    rtparen = strfind(uid, '(') - 1;
+    uid = uid(lfteq:rtparen);
+
+    yrinth_str = 'p_r_e_s_t_o_';
+    yrinth_str_shared = 'p_r_e_s_t_o_sh_';
     TMPFS_PATH = '/dev/shm/';
 
     % serialize a cell containing the split objects
@@ -195,7 +202,7 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
     if parmode
 
       if bundlemode
-        num_workers = evalin('caller', ['length(matlabyrinth_workers)']);
+        num_workers = evalin('base', ['length(matlabyrinth_workers)']);
         total_tasks = num_jobs;
         try
           skip = varargin{6};
@@ -225,7 +232,7 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
           job_str_shared = [job_str_shared, yrinth_str_shared, splitID, ''', '''];
         end
         job_str_shared = job_str_shared(1:end-3);
-        save_str = ['''', TMPFS_PATH, '.jshared.mat'', ', job_str_shared];
+        save_str = ['''', TMPFS_PATH, '.', uid, '_sh.mat'', ', job_str_shared];
         evalin('caller', ['save(', save_str , ')']);
       end
 
@@ -244,7 +251,7 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
           fst = int2str((i-1)*PPN+1);
           lst = int2str((i-1)*PPN+PPN);
         end
-        jobrng = [fst,':',lst]
+        jobrng = [fst,':',lst];
 
         for j=1:num_split_objects
           splitID = int2str(j);
@@ -253,11 +260,11 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
         end
         job_str = job_str(1:end-3);
 
-        save_str = ['''', TMPFS_PATH, '.jd_', jobid, '.mat'', ', job_str];
+        save_str = ['''', TMPFS_PATH, '.', uid, '_sp_', jobid, '.mat'', ', job_str];
         evalin('caller', ['save(', save_str , ')']);
 
         mesg{i} = [remote_method, ', ', varargin{1}, ', ', jobid, ...
-                          ', ', TMPFS_PATH, '.jd_', jobid, '.mat, ', int2str(num_shared_objs)];
+                          ', ', TMPFS_PATH, '.', uid, '_sp_', jobid, '.mat, ', int2str(num_shared_objs)];
       end
 
     else
@@ -273,7 +280,7 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
       end
       if num_shared_objs > 0
         job_str_shared = job_str_shared(1:end-3);
-        save_str = ['''', TMPFS_PATH, '.jshared.mat'', ', job_str_shared]
+        save_str = ['''', TMPFS_PATH, '.', uid, '_sh.mat'', ', job_str_shared];
         evalin('caller', ['save(', save_str , ')']);
       end
 
@@ -288,11 +295,11 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
         end
         job_str = job_str(1:end-3);
 
-        save_str = ['''', TMPFS_PATH, '.jd_', jobid, '.mat'', ', job_str];
+        save_str = ['''', TMPFS_PATH, '.', uid, '_sp_', jobid, '.mat'', ', job_str];
         evalin('caller', ['save(', save_str , ')']);
 
         mesg{i} = [remote_method, ', ', varargin{1}, ', ', jobid, ...
-                          ', ', TMPFS_PATH, '.jd_', jobid, '.mat, ', int2str(num_shared_objs)];
+                          ', ', TMPFS_PATH, '.', uid, '_sp_', jobid, '.mat, ', int2str(num_shared_objs)];
       end
     end
   end
@@ -370,21 +377,17 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
       D = deserialize(R{i});
       A(i) = D{1};
       B(i) = D{2};
-    end
-
+    end 
   else 
     for i=1:num_results
       result_file = char(results(i));
       load(result_file);
-      [token, remain] = strtok(result_file, '_');
+      [token, remain] = strtok(result_file, 'r');
       idx = remain(2:strfind(remain, '.')-1);
       idx = str2num(idx);
       if parmode
         if bundlemode
           for j=1:skip
-  %          total_tasks
-  %          j
-  %          idx
             if idx ~= num_jobs 
               A(skip*(idx-1)+j) = ret1(j);
               B(skip*(idx-1)+j) = ret2(j);
@@ -409,3 +412,4 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
   end
 
   sock.close();
+  evalin('caller', 'clearvars p_r_e_s_t_o_*');

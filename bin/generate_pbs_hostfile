@@ -1,0 +1,21 @@
+#!/usr/bin/env python
+import subprocess
+import sys
+import os
+
+nodes = subprocess.check_output('cat ' + os.environ['PBS_NODEFILE'], shell=True)
+
+nodes = nodes.split('\n')
+
+hostfile = open('pbs_hostfile', 'w')
+
+node_set = set()
+
+for node in nodes:
+  node_set.add(node)
+
+for node in node_set:
+  if len(node) > 0:
+    hostfile.write(node + ' max_slots=1\n') 
+
+hostfile.close()

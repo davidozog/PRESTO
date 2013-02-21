@@ -1,4 +1,4 @@
-PESTO: Parallel Execution System for Task Operation
+PRESTO: Parallel Runtime Execution System for Task Operation
 ===================================================
 Pesto is a distributed framework that supports various parallel
 computational models (e.g. master/worker, pipeline, graph-based,
@@ -12,56 +12,58 @@ INSTALLATION
 Please read the INSTALL file.
 
 
-USING PESTO WITH MATLAB
+USING PRESTO WITH MATLAB
 =======================
 After installing, you can use the following command to count the 
 number of available generic compute nodes on the Aciss cluster:
 
-  interactive_job count
+  interactive_job --count
 
 ( Note: if you are not using Aciss, then you may be able to
-  customize this script in $PESTO/bin/ for your PBS scheduler.)
+  customize this script in $PRESTO/bin/ for your PBS scheduler.)
 
-Then you can launch PESTO with some number of MATLAB instances 
+Then you can launch PRESTO with some number of MATLAB instances 
 less than the number printed above.  For example, if 4 or more 
 compute nodes are available, then you can issue the following 
 command to launch an interactive session in the resource queue 
 with 4 processes:
 
-  interactive_job 4
+  interactive_job -n 4
 
-Then you must launch PESTO itself with 1 master process and 3 
-worker processes.  This is done by running the following command 
-to launch Matlab computational engines:
+Then you simply launch presto:
 
-  pesto 4 matlab
+  presto
+
+For more custom usage information, type:
+
+  presto -h
 
 This will launch a single interactive Matlab environment on the 
 current node, and 3 other Matlabs running in the background on 
 the other 3 compute nodes.
 
-When using PESTO with Stingray, you need to use a special branch 
+When using PRESTO with Stingray, you need to use a special branch 
 that allows workers to use the Matlab Parallel Computing Toolbox:
 
-  export STINGRAY=$STINGRAY/branches/PESTO
+  export STINGRAY=$STINGRAY/branches/PRESTO
 
 
-USING PESTO WITH JAVA
+USING PRESTO WITH JAVA
 ======================
 If are using Java computational engines, then do the following 
-to launch PESTO:
+to launch PRESTO:
 
-  pesto 4 java <JavaAppName>
+  presto --engine java --app <JavaAppName>
 
 where <JavaAppName> is the name of your Java application.
 
 
-TESTING PESTO
+TESTING PRESTO
 =============
 Besides running Stingray with the .m files above, you should be 
 able to test the installation with this simple example.  
 
-First, begin by launching PESTO as described above with 4 compute 
+First, begin by launching PRESTO as described above with 4 compute 
 nodes. If the launch worked, you should see 3 lines confirming 
 the connection of the workers to the master process:
 
@@ -72,9 +74,9 @@ the connection of the workers to the master process:
 If so, type the following Matlab commands into the interative 
 session:
 
-  m = getenv('PESTO');
-  load([m, '/src/PESTO/my_split.mat'])
-  load([m, '/src/PESTO/my_shared.mat'])
+  m = getenv('PRESTO');
+  load([m, '/src/PRESTO/my_split.mat'])
+  load([m, '/src/PRESTO/my_shared.mat'])
   [x y] = send_jobs_to_workers('Rinth_testfunc', 'TMPFS', {'aStation', 'tlMisfit_sub'}, {'srModel'})
 
 When the quick computation is finished, the x.A0 object should 
@@ -159,7 +161,7 @@ and the y object should contain:
           nramat: 33
 
 
-To safely shutdown PESTO, type the following commands:
+To safely shutdown PRESTO, type the following commands:
 
     >> kill_workers
     
