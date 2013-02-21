@@ -1,6 +1,6 @@
 PRESTO: Parallel Runtime Environment for Scalable Task-Oriented Compuations
 ===========================================================================
-Pesto is a distributed framework that supports various parallel
+Presto is a distributed framework that supports various parallel
 computational models (e.g. master/worker, pipeline, graph-based,
 MapReduce, etc.) with various programming adaptors (Matlab, 
 Java, C++, etc.)  Currently, this repository includes code that
