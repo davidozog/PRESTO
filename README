@@ -13,7 +13,7 @@ Please read the INSTALL file.
 
 
 USING PRESTO WITH MATLAB
-=======================
+========================
 After installing, you can use the following command to count the 
 number of available generic compute nodes on the Aciss cluster:
 
@@ -59,7 +59,7 @@ where <JavaAppName> is the name of your Java application.
 
 
 TESTING PRESTO
-=============
+==============
 Besides running Stingray with the .m files above, you should be 
 able to test the installation with this simple example.  
 

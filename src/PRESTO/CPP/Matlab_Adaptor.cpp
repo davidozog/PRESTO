@@ -42,6 +42,8 @@ void Matlab_Adaptor::Launch_CE(const char *flags, int background){
     exit (-1);
   }
 
+  setenv("STINGRAY","/home/dave/School/Stingray/trunk",1);
+
   if ( background ) {
     fp = popen(mPath, "r");
     while ( fgets( line, sizeof line, fp)) {
