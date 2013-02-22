@@ -3,6 +3,8 @@ function varargout = send_jobs_to_workers(remote_method, varargin)
   DEBUG = 1;
   PPN = 12;
 
+  remote_method
+
   fprintf(1, ['nargout is ', int2str(nargout(remote_method)), '\n']);
 
   nVarargs = length(varargin);
@@ -190,16 +192,16 @@ function varargout = send_jobs_to_workers(remote_method, varargin)
     TMPFS_PATH = '/dev/shm/';
 
     % serialize a cell containing the split objects
-    splitVarStr = '';
-    num_split_objects = length(varargin{1});
-    for i=1:num_split_objects
-      splitVarStr = [splitVarStr, varargin{1}{i}, ', '];
-    end
+%    splitVarStr = '';
+%    num_split_objects = length(varargin{1});
+%    for i=1:num_split_objects
+%      splitVarStr = [splitVarStr, varargin{1}{i}, ', '];
+%    end
     %fprintf(1, ['splitVarStr is ', splitVarStr]);
 
     % Get size of first variable and assume it's the number of jobs
     num_jobs = evalin('caller', ['length(', varargin{1}{1}, ')']);
-    num_jobs = num_split_objects;
+%    num_jobs = num_split_objects;
 
     if parmode
 
@@ -215,12 +217,12 @@ function varargout = send_jobs_to_workers(remote_method, varargin)
         end
     
       else
-        total_tasks = num_jobs;
-        if mod(num_jobs, PPN) == 0
-          num_jobs = num_jobs/PPN;
-        else
-          num_jobs = floor(num_jobs/PPN) + 1;
-        end
+        total_tasks = num_jobs
+        %if mod(num_jobs, PPN) == 0
+        %  num_jobs = num_jobs/PPN;
+        %else
+        %  num_jobs = floor(num_jobs/PPN) + 1;
+        %end
         display(['Total Number of Jobs: ', num2str(num_jobs)]);
 
       end
@@ -260,7 +262,7 @@ function varargout = send_jobs_to_workers(remote_method, varargin)
         end
         jobrng = [fst,':',lst];
 
-        for j=1:num_split_objects
+        for j=1:num_jobs
           splitID = int2str(j);
           job_str = [job_str, yrinth_str, splitID, ''', '''];
           evalin('caller', [yrinth_str,splitID,'=', varargin{1}{j},'(',jobrng,');']);
