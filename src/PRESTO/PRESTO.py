@@ -119,7 +119,7 @@ if (rank==0):
   for i in range(1,size):
     data[i] = mpiComm.recv(source=i, tag=CHECKIN_TAG)
 
-  worker_dict = 'matlabyrinth_workers = struct(\'hosts\', {'
+  worker_dict = 'presto_workers = struct(\'hosts\', {'
   for i in range(1,size):
     worker_dict = worker_dict + '\'' + data[i]['name'] + '\', '
   worker_dict = worker_dict + '}, \'ranks\', {'
