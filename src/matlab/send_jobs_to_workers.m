@@ -192,11 +192,11 @@ function varargout = send_jobs_to_workers(remote_method, varargin)
     TMPFS_PATH = '/dev/shm/';
 
     % serialize a cell containing the split objects
-%    splitVarStr = '';
-%    num_split_objects = length(varargin{1});
-%    for i=1:num_split_objects
-%      splitVarStr = [splitVarStr, varargin{1}{i}, ', '];
-%    end
+    splitVarStr = '';
+    num_split_objects = length(varargin{1});
+    for i=1:num_split_objects
+      splitVarStr = [splitVarStr, varargin{1}{i}, ', '];
+    end
     %fprintf(1, ['splitVarStr is ', splitVarStr]);
 
     % Get size of first variable and assume it's the number of jobs
@@ -218,11 +218,11 @@ function varargout = send_jobs_to_workers(remote_method, varargin)
     
       else
         total_tasks = num_jobs
-        %if mod(num_jobs, PPN) == 0
-        %  num_jobs = num_jobs/PPN;
-        %else
-        %  num_jobs = floor(num_jobs/PPN) + 1;
-        %end
+        if mod(num_jobs, PPN) == 0
+          num_jobs = num_jobs/PPN;
+        else
+          num_jobs = floor(num_jobs/PPN) + 1;
+        end
         display(['Total Number of Jobs: ', num2str(num_jobs)]);
 
       end

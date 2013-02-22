@@ -17,6 +17,7 @@ DEBUG = True
 
 #MATLAB_BIN = '/usr/local/packages/MATLAB/R2011b/bin/matlab'
 MATLAB_BIN = os.environ['MATLAB'] + '/bin/matlab'
+PRESTO_DIR = os.environ['PRESTO']
 CHECKIN_TAG = 1
 DO_WORK_TAG = 2
 KILL_TAG    = 3
@@ -35,7 +36,9 @@ messageQueue = False
 
 def launch_matlab(queue, worker_dict):
   # Without GUI:
-  p = subprocess.Popen(MATLAB_BIN + ' -nodesktop -nosplash -r \"'+ 
+  presto_mpath = os.path.join(PRESTO_DIR, 'presto_setpath.m')
+
+  p = subprocess.Popen(MATLAB_BIN + ' -nodesktop -nosplash -r \"run ' + presto_mpath + ';' + 
                        worker_dict + '\"', shell=True)
   # With GUI:
   #p = subprocess.Popen(MATLAB_BIN + ' -desktop -r \"'+ worker_dict + 
@@ -333,8 +336,7 @@ else:
   #p = subprocess.Popen(args, stdout=subprocess.PIPE)
 
   if interface == 'matlab':
-    presto_dir = os.environ['PRESTO']
-    presto_mpath = os.path.join(presto_dir, 'presto_setpath.m')
+    presto_mpath = os.path.join(PRESTO_DIR, 'presto_setpath.m')
     cmd = MATLAB_BIN + ' -nosplash -r "run ' + presto_mpath + '; mworker(\''+name+'\', '+srank+')" -nodesktop'
   elif interface == 'java':
     cmd = "java Worker " + name + " " + srank
