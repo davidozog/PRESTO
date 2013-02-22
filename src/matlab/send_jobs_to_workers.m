@@ -199,6 +199,8 @@ function varargout = send_jobs_to_workers(remote_method, varargin)
 
     % Get size of first variable and assume it's the number of jobs
     num_jobs = evalin('caller', ['length(', varargin{1}{1}, ')']);
+    num_jobs = num_split_objects;
+
     if parmode
 
       if bundlemode
