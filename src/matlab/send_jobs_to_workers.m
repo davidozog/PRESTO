@@ -1,4 +1,4 @@
-function [A B] = send_jobs_to_workers(remote_method, varargin)
+function varargout = send_jobs_to_workers(remote_method, varargin)
 
   DEBUG = 1;
   PPN = 12;
@@ -30,26 +30,26 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
   %      send_jobs_to_workers('myfunc', 'TMPFS', {'split1', 'split2'}, ...
   %                           {'shared1', 'shared2'})
 
-  firstvar = varargin{1};
-  mode=1;
-  try
-    if strcmp(firstvar, 'NFS')
-      mode = 1;
-    elseif strcmp(firstvar, 'NETWORK')
-      mode = 3;
-    elseif strcmp(firstvar, 'TMPFS')
-      mode = 4;
-    else 
-      mode = 2;
-    end
-  catch
-    mode=2;
-  end
+  %firstvar = varargin{1};
+  mode=4;
+  %try
+  %  if strcmp(firstvar, 'NFS')
+  %    mode = 1;
+  %  elseif strcmp(firstvar, 'NETWORK')
+  %    mode = 3;
+  %  elseif strcmp(firstvar, 'TMPFS')
+  %    mode = 4;
+  %  else 
+  %    mode = 2;
+  %  end
+  %catch
+  %  mode=2;
+  %end
 
-  % 5th arg is whether or not to use Matlab PCT:
+  % 4th arg is whether or not to use Matlab PCT:
   try
-    parvar = varargin{4};
-    if varargin{4}
+    parvar = varargin{3};
+    if varargin{3}
       parmode = true;
     else 
       parmode = false;
@@ -60,8 +60,8 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
 
   % 6th arg is whether or not to bundle task groups together:
   try
-    bundlevar = varargin{5};
-    if varargin{5}
+    bundlevar = varargin{4};
+    if varargin{4}
       bundlemode = true;
     else 
       bundlemode = false;
@@ -72,7 +72,7 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
 
   % MODE 1:
   if mode==1
-    load(varargin{2})
+    load(varargin{1})
     %W = whos;
     %num_jobs = length(W(1).size);
     %num_jobs = W(1).size(1)
@@ -94,8 +94,8 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
         aStation = aStation_( (j-1)*PPN+1 : ((j-1)*PPN+PPN) );
         tlMisfit_sub = tlMisfit_sub_( (j-1)*PPN+1 : ((j-1)*PPN+PPN) );
         save(horzcat('.split_', jobid, '.mat'), 'aStation', 'tlMisfit_sub');
-        mesg{j} = horzcat(remote_method, ', ', varargin{1}, ', ', jobid, ...
-                          ', ', './.split_', jobid, '.mat, ', varargin{3}, ...
+        mesg{j} = horzcat(remote_method, ', ', varargin{0}, ', ', jobid, ...
+                          ', ', './.split_', jobid, '.mat, ', varargin{2}, ...
                           ', ', 'P');
       end
 
@@ -105,8 +105,8 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
         aStation = aStation_(j);
         tlMisfit_sub = tlMisfit_sub_(j);
         save(horzcat('.split_', jobid, '.mat'), 'aStation', 'tlMisfit_sub');
-        mesg{j} = horzcat(remote_method, ', ', varargin{1}, ', ', jobid, ...
-                          ', ', './.split_', jobid, '.mat, ', varargin{3});
+        mesg{j} = horzcat(remote_method, ', ', varargin{0}, ', ', jobid, ...
+                          ', ', './.split_', jobid, '.mat, ', varargin{2});
       end
     end
   end
@@ -140,25 +140,25 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
 
     % serialize a cell containing the split objects
     splitVarStr = '';
-    num_split_objects = length(varargin{2});
+    num_split_objects = length(varargin{1});
     for i=1:num_split_objects
-      splitVarStr = [splitVarStr, varargin{2}{i}, ', '];
+      splitVarStr = [splitVarStr, varargin{1}{i}, ', '];
     end
 
     % Get size of first variable and assume it's the number of jobs
-    num_jobs = evalin('caller', ['length(', varargin{2}{1}, ')']);
+    num_jobs = evalin('caller', ['length(', varargin{1}{1}, ')']);
 
     % serialize a cell containing the shared objects
     sharedVarStr = '';
-    for i=1:length(varargin{3})
-      sharedVarStr = [sharedVarStr, varargin{3}{i}, ', '];
+    for i=1:length(varargin{2})
+      sharedVarStr = [sharedVarStr, varargin{2}{i}, ', '];
     end
 
     shmem_size = zeros(num_jobs, 1);
     for i=1:num_jobs
       job_str = '';
       for j=1:num_split_objects
-        job_str = [job_str, varargin{2}{j},'(',num2str(i),'),'];
+        job_str = [job_str, varargin{1}{j},'(',num2str(i),'),'];
       end
         evalin('caller', [yrinth_str,num2str(i),'=serialize({',job_str,...
                sharedVarStr,'});']);
@@ -168,7 +168,7 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
     mesg{num_jobs} = '';
     for j = 1:num_jobs
       jobid = int2str(j);
-      mesg{j} = horzcat(remote_method, ', ', varargin{1}, ', ', ...
+      mesg{j} = horzcat(remote_method, ', ', varargin{0}, ', ', ...
                     jobid, ', ', './.split_', jobid, '.mat, ', ...
                     int2str(shmem_size(j)));
     end
@@ -191,21 +191,21 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
 
     % serialize a cell containing the split objects
     splitVarStr = '';
-    num_split_objects = length(varargin{2});
+    num_split_objects = length(varargin{1});
     for i=1:num_split_objects
-      splitVarStr = [splitVarStr, varargin{2}{i}, ', '];
+      splitVarStr = [splitVarStr, varargin{1}{i}, ', '];
     end
     %fprintf(1, ['splitVarStr is ', splitVarStr]);
 
     % Get size of first variable and assume it's the number of jobs
-    num_jobs = evalin('caller', ['length(', varargin{2}{1}, ')']);
+    num_jobs = evalin('caller', ['length(', varargin{1}{1}, ')']);
     if parmode
 
       if bundlemode
         num_workers = evalin('base', ['length(matlabyrinth_workers)']);
         total_tasks = num_jobs;
         try
-          skip = varargin{6};
+          skip = varargin{5};
           num_jobs = ceil(num_jobs / skip)
         catch
           skip = ceil(num_jobs / num_workers);
@@ -213,6 +213,7 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
         end
     
       else
+        total_tasks = num_jobs;
         if mod(num_jobs, PPN) == 0
           num_jobs = num_jobs/PPN;
         else
@@ -224,11 +225,11 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
 
       % Shared data:
       job_str_shared = '''';
-      num_shared_objs = length(varargin{3});
+      num_shared_objs = length(varargin{2});
       if num_shared_objs > 0
         for k=1:num_shared_objs
           splitID = int2str(k);
-          evalin('caller', [yrinth_str_shared,splitID,'=', varargin{3}{k}, ';']);
+          evalin('caller', [yrinth_str_shared,splitID,'=', varargin{2}{k}, ';']);
           job_str_shared = [job_str_shared, yrinth_str_shared, splitID, ''', '''];
         end
         job_str_shared = job_str_shared(1:end-3);
@@ -249,21 +250,25 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
           end
         else
           fst = int2str((i-1)*PPN+1);
-          lst = int2str((i-1)*PPN+PPN);
+          if (i-1)*PPN+PPN <= total_tasks
+            lst = int2str((i-1)*PPN+PPN);
+          else
+            lst = int2str(total_tasks);
+          end
         end
         jobrng = [fst,':',lst];
 
         for j=1:num_split_objects
           splitID = int2str(j);
           job_str = [job_str, yrinth_str, splitID, ''', '''];
-          evalin('caller', [yrinth_str,splitID,'=', varargin{2}{j},'(',jobrng,');']);
+          evalin('caller', [yrinth_str,splitID,'=', varargin{1}{j},'(',jobrng,');']);
         end
         job_str = job_str(1:end-3);
 
         save_str = ['''', TMPFS_PATH, '.', uid, '_sp_', jobid, '.mat'', ', job_str];
         evalin('caller', ['save(', save_str , ')']);
 
-        mesg{i} = [remote_method, ', ', varargin{1}, ', ', jobid, ...
+        mesg{i} = [remote_method, ', TMPFS, ', jobid, ...
                           ', ', TMPFS_PATH, '.', uid, '_sp_', jobid, '.mat, ', int2str(num_shared_objs)];
       end
 
@@ -272,10 +277,10 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
 
       % Shared data:
       job_str_shared = '''';
-      num_shared_objs = length(varargin{3})
+      num_shared_objs = length(varargin{2})
       for k=1:num_shared_objs
         splitID = int2str(k);
-        evalin('caller', [yrinth_str_shared,splitID,'=', varargin{3}{k}, ';']);
+        evalin('caller', [yrinth_str_shared,splitID,'=', varargin{2}{k}, ';']);
         job_str_shared = [job_str_shared, yrinth_str_shared, splitID, ''', '''];
       end
       if num_shared_objs > 0
@@ -291,14 +296,14 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
         for j=1:num_split_objects
           splitID = int2str(j);
           job_str = [job_str, yrinth_str, splitID, ''', '''];
-          evalin('caller', [yrinth_str,splitID,'=', varargin{2}{j},'(',jobid,');']);
+          evalin('caller', [yrinth_str,splitID,'=', varargin{1}{j},'(',jobid,');']);
         end
         job_str = job_str(1:end-3);
 
         save_str = ['''', TMPFS_PATH, '.', uid, '_sp_', jobid, '.mat'', ', job_str];
         evalin('caller', ['save(', save_str , ')']);
 
-        mesg{i} = [remote_method, ', ', varargin{1}, ', ', jobid, ...
+        mesg{i} = [remote_method, ', TMPFS, ', jobid, ...
                           ', ', TMPFS_PATH, '.', uid, '_sp_', jobid, '.mat, ', int2str(num_shared_objs)];
       end
     end
@@ -375,8 +380,9 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
 
     for i=1:num_results
       D = deserialize(R{i});
-      A(i) = D{1};
-      B(i) = D{2};
+      %A(i) = D{1};
+      %B(i) = D{2};
+      fprintf(2, 'ERROR: This mode isnt supported anymore.\n')
     end 
   else 
     for i=1:num_results
@@ -389,22 +395,39 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
         if bundlemode
           for j=1:skip
             if idx ~= num_jobs 
-              A(skip*(idx-1)+j) = ret1(j);
-              B(skip*(idx-1)+j) = ret2(j);
+              %A(skip*(idx-1)+j) = ret1(j);
+              %B(skip*(idx-1)+j) = ret2(j);
+              for k=1:nargout
+                eval(['varargout{k}(skip*(idx-1)+j) = ret',num2str(k),'(j);']);
+              end
             elseif skip*(idx-1)+j <= total_tasks
-              A(skip*(idx-1)+j) = ret1(j);
-              B(skip*(idx-1)+j) = ret2(j);
+              %A(skip*(idx-1)+j) = ret1(j);
+              %B(skip*(idx-1)+j) = ret2(j);
+              for k=1:nargout
+                eval(['varargout{k}(skip*(idx-1)+j) = ret',num2str(k),'(j);']);
+              end
             end
           end
         else
           for j=1:PPN
-            A(PPN*(idx-1)+j) = struct(ret1(j));
-            B(PPN*(idx-1)+j) = struct(ret2(j));
+            %A(PPN*(idx-1)+j) = struct(ret1(j));
+            %B(PPN*(idx-1)+j) = struct(ret2(j));
+            % Might need to be struct for Stingray:
+            if idx ~= num_jobs 
+              for k=1:nargout
+                eval(['varargout{k}(PPN*(idx-1)+j) = ret',num2str(k),'(j);']);
+              end
+            elseif PPN*(idx-1)+j <= total_tasks
+              for k=1:nargout
+                eval(['varargout{k}(PPN*(idx-1)+j) = ret',num2str(k),'(j);']);
+              end
+            end
           end
         end
       else 
-        A(idx) = struct(ret1);
-        B(idx) = struct(ret2);
+        for k=1:nargout
+          eval(['varargout{k}(idx) = ret', num2str(k),';']);
+        end
       end
       system(['rm ', result_file]);
     end

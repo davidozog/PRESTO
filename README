@@ -77,7 +77,7 @@ session:
   m = getenv('PRESTO');
   load([m, '/src/PRESTO/my_split.mat'])
   load([m, '/src/PRESTO/my_shared.mat'])
-  [x y] = send_jobs_to_workers('Rinth_testfunc', 'TMPFS', {'aStation', 'tlMisfit_sub'}, {'srModel'})
+  [x y] = send_jobs_to_workers('Rinth_testfunc', {'aStation', 'tlMisfit_sub'}, {'srModel'})
 
 When the quick computation is finished, the x.A0 object should 
 contain:

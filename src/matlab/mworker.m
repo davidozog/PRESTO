@@ -33,6 +33,7 @@ function mworker(my_hostname, rank)
   mesg = 'alive';
   out.println(mesg);
 
+  matlabpool close force local
   matlabpool open
 
     run = 1;
@@ -144,12 +145,41 @@ function mworker(my_hostname, rank)
         arg_str
         function_name
       if(DEBUG); fprintf(2, horzcat('Entering...\n')); end
+        noutargs = evalin('base', ['nargout(''', function_name, ''')']);
+          if noutargs == 0
+        evalin('base', [function_name, '(', arg_str, ')']); 
+          elseif noutargs == 1
+        [ret1]= evalin('base', [function_name, '(', arg_str, ')']); 
+          elseif noutargs == 2
         [ret1 ret2] = evalin('base', [function_name, '(', arg_str, ')']); 
+          elseif noutargs == 3
+        [ret1 ret2 ret3] = evalin('base', [function_name, '(', arg_str, ')']); 
+          elseif noutargs == 4
+        [ret1 ret2 ret3 ret4] = evalin('base', [function_name, '(', arg_str, ')']); 
+          elseif noutargs == 5
+        [ret1 ret2 ret3 ret4 ret5] = evalin('base', [function_name, '(', arg_str, ')']); 
+          else
+        fprintf(2, 'ERROR: Too many output arguments, a Matlab language limitation.\n')
+        fprintf(2, 'ERROR: You can try writing your own line above.\n')
+        end
       if(DEBUG); fprintf(2, horzcat('Leaving\n')); end
 
         % write results to file and pass path to master
         results_file = [TMPFS_PATH, '.', uid, '_r', jobid, '.mat'];
+          if noutargs == 0
+        dummy = 0
+        save(results_file, 'dummy');
+          elseif noutargs == 1
+        save(results_file, 'ret1');
+          elseif noutargs == 2
         save(results_file, 'ret1', 'ret2');
+          elseif noutargs == 3
+        save(results_file, 'ret1', 'ret2', 'ret3');
+          elseif noutargs == 4
+        save(results_file, 'ret1', 'ret2', 'ret3', 'ret4');
+          elseif noutargs == 5
+        save(results_file, 'ret1', 'ret2', 'ret3', 'ret4', 'ret5');
+        end
         out.println(results_file);
         system(['rm ', split_file, ' ', results_file]);
 
