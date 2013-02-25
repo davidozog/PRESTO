@@ -206,7 +206,7 @@ function varargout = send_jobs_to_workers(remote_method, varargin)
     if parmode
 
       if bundlemode
-        num_workers = evalin('base', ['length(matlabyrinth_workers)']);
+        num_workers = evalin('base', ['length(presto_workers)']);
         total_tasks = num_jobs;
         try
           skip = varargin{5};
