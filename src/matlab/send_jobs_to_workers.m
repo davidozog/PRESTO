@@ -1,11 +1,7 @@
-function varargout = send_jobs_to_workers(remote_method, varargin)
+function [A B] = send_jobs_to_workers(remote_method, varargin)
 
-  DEBUG = 1;
+  DEBUG = 0;
   PPN = 12;
-
-  remote_method
-
-  fprintf(1, ['nargout is ', int2str(nargout(remote_method)), '\n']);
 
   nVarargs = length(varargin);
 
@@ -262,7 +258,7 @@ function varargout = send_jobs_to_workers(remote_method, varargin)
         end
         jobrng = [fst,':',lst];
 
-        for j=1:num_jobs
+        for j=1:num_split_objects
           splitID = int2str(j);
           job_str = [job_str, yrinth_str, splitID, ''', '''];
           evalin('caller', [yrinth_str,splitID,'=', varargin{1}{j},'(',jobrng,');']);
@@ -389,6 +385,10 @@ function varargout = send_jobs_to_workers(remote_method, varargin)
       fprintf(2, 'ERROR: This mode isnt supported anymore.\n')
     end 
   else 
+    
+    A = zeros(1,total_tasks);
+    B = zeros(1,total_tasks);
+
     for i=1:num_results
       result_file = char(results(i));
       load(result_file);
@@ -397,21 +397,31 @@ function varargout = send_jobs_to_workers(remote_method, varargin)
       idx = str2num(idx);
       if parmode
         if bundlemode
-          for j=1:skip
-            if idx ~= num_jobs 
-              %A(skip*(idx-1)+j) = ret1(j);
-              %B(skip*(idx-1)+j) = ret2(j);
-              for k=1:nargout
-                eval(['varargout{k}(skip*(idx-1)+j) = ret',num2str(k),'(j);']);
-              end
-            elseif skip*(idx-1)+j <= total_tasks
-              %A(skip*(idx-1)+j) = ret1(j);
-              %B(skip*(idx-1)+j) = ret2(j);
-              for k=1:nargout
-                eval(['varargout{k}(skip*(idx-1)+j) = ret',num2str(k),'(j);']);
-              end
-            end
+          skip
+          if idx ~= num_jobs 
+            A(skip*(idx-1)+1:skip*(idx-1)+skip) = ret1(1:skip);
+            B(skip*(idx-1)+1:skip*(idx-1)+skip) = ret2(1:skip);
+          else
+            A(skip*(idx-1)+1:total_tasks) = ret1(1:skip);
+            B(skip*(idx-1)+1:total_tasks) = ret2(1:skip);
           end
+          
+%          for j=1:skip
+%            myid = skip*(idx-1)+j;
+%            if idx ~= num_jobs 
+%              A(myid) = ret1(j);
+%              B(myid) = ret2(j);
+%              %for k=1:nargout
+%              %  eval(['varargout{k}(skip*(idx-1)+j) = ret',num2str(k),'(j);']);
+%              %end
+%            elseif myid <= total_tasks
+%              A(myid) = ret1(j);
+%              B(myid) = ret2(j);
+%              %for k=1:nargout
+%              %  eval(['varargout{k}(skip*(idx-1)+j) = ret',num2str(k),'(j);']);
+%              %end
+%            end
+%          end
         else
           for j=1:PPN
             %A(PPN*(idx-1)+j) = struct(ret1(j));

@@ -13,7 +13,7 @@ import sysv_ipc
 import mmap
 import shmemUtils
 
-DEBUG = True
+DEBUG = False
 
 #MATLAB_BIN = '/usr/local/packages/MATLAB/R2011b/bin/matlab'
 MATLAB_BIN = os.environ['MATLAB'] + '/bin/matlab'
