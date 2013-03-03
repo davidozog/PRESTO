@@ -8,8 +8,9 @@ JC = javac
 	$(JC) $(JFLAGS) $*.java #-Xlint:unchecked
 
 CLASSES = \
-	Master.java \
+	SystemCall.java \
 	TestClass.java \
+	Master.java \
 	Worker.java
 	
 default: classes

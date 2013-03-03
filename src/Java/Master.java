@@ -21,10 +21,13 @@ class Master {
     int numTasks = Obj.length; 
     String id, dataFilePath;
 
+    SystemCall sys_call = new SystemCall();
+    String uid = sys_call.callUID();
+
     for ( int i=0; i<numTasks; i= i+1 ) {
 
       id = Integer.toString(i);
-      dataFilePath = "/dev/shm/.jv_" + id + ".data";
+      dataFilePath = "/dev/shm/." + uid + "_" + id + ".data";
       f_out = new FileOutputStream(dataFilePath);
 
       /* Write object out to disk */

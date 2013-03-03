@@ -65,16 +65,21 @@ public class TestClass implements java.io.Serializable {
     for (int i=0; i<numTasks; i++) {
       TArrayIn[i] = new TestClass (i, i+numTasks);
     }
+
+    SystemCall sys_call = new SystemCall();
+    String uid = sys_call.callUID();
+
+    System.out.println("hi " + uid);
     
-    M.Launch();
-    TArrayOut = M.SendJobsToWorkers("TestKernel2", TArrayIn);
-
-    for (int i=0; i<numTasks; i++) {
-      System.out.println("Final Results #"+Integer.toString(i) +" are: " + 
-      Integer.toString(TArrayOut[i].a) + " " + Float.toString(TArrayOut[i].b));
-    }
-
-    M.Destroy();
+//    M.Launch();
+//    TArrayOut = M.SendJobsToWorkers("TestKernel2", TArrayIn);
+//
+//    for (int i=0; i<numTasks; i++) {
+//      System.out.println("Final Results #"+Integer.toString(i) +" are: " + 
+//      Integer.toString(TArrayOut[i].a) + " " + Float.toString(TArrayOut[i].b));
+//    }
+//
+//    M.Destroy();
     
   }
 
