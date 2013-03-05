@@ -1,0 +1,41 @@
+#################################################################
+##    Test Forward solver                             ###########
+#################################################################
+
+################ Parameters to submit the job to mist cluster
+#: task                         for
+#: parallelism	                 gpu
+#: max_time                     10
+parallelism   cuda
+
+################ Parameters for the LFM computation  
+datapath  /home11/ozog/Data/s108/BrainK/
+
+# use braink directory as input 
+braink_data_dir         108_01_2000_MR_EIT_OHSU_128
+data_set_kind           indiv_cond_MR
+
+# or edited files
+#geometry	Cylinder-for-FDM-HM.dat
+#dipoles_file_name	pl_srcs_364.txt
+#sensors		Cylinder.sensors_average-HM.txt
+
+# output name 
+output_name_prefix	for_pair-i103s45
+
+################ Forward solver parameters 
+algorithm    adi
+
+time_step		2.8
+tol			0.0002
+max_iter		2000
+
+tissues          air  wm    skull  scalp  csf   gm   iair   
+tissues_conds		0.0  0.35  0.018  0.44   1.79	 0.25 0.0    
+
+current 	    	20.644473
+current_src 		103
+current_sink   45
+
+solution 		sensors
+

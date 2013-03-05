@@ -10,24 +10,32 @@ class Master {
 
   public Master(){};
 
-  public <T> T[] SendJobsToWorkers(String method, T[] Obj) throws Exception {
+  public <T> T[] SendJobsToWorkers(String method, T[] Obj, String s) throws Exception {
 
     /* Write to disk with FileOutputStream */
-    FileOutputStream f_out;
+    FileOutputStream s_out, f_out;
 
     /* Write object with ObjectOutputStream */
     ObjectOutputStream obj_out;
     
     int numTasks = Obj.length; 
-    String id, dataFilePath;
+    String id, shrDataFilePath, dataFilePath;
 
     SystemCall sys_call = new SystemCall();
     String uid = sys_call.callUID();
 
+    System.out.println(s);
+
+    /* Shared data first */ 
+    shrDataFilePath = "/dev/shm/." + uid + "_sh.mat";
+    s_out = new FileOutputStream(shrDataFilePath);
+    obj_out = new ObjectOutputStream (s_out);
+    obj_out.writeObject ( s );
+
     for ( int i=0; i<numTasks; i= i+1 ) {
 
       id = Integer.toString(i);
-      dataFilePath = "/dev/shm/." + uid + "_" + id + ".data";
+      dataFilePath = "/dev/shm/." + uid + "_sp_" + id + ".mat";
       f_out = new FileOutputStream(dataFilePath);
 
       /* Write object out to disk */
@@ -71,8 +79,8 @@ class Master {
         
         /* Get job ID from filename */
         String[] splits = fromMPI.split("_");
-        System.out.println("this is :" + splits[1].substring(0, splits[1].indexOf(".")));
-        strIdx = splits[1].substring(0, splits[1].indexOf("."));
+        System.out.println("this is :" + splits[1].substring(1, splits[1].indexOf(".")));
+        strIdx = splits[1].substring(1, splits[1].indexOf("."));
         idx = Integer.parseInt(strIdx);
 
         Obj[idx] = (T)obj;

@@ -8,3 +8,5 @@ worker*.err
 *.swp
 *.swo
 *src/PESTO/CPP/PESTO
+examples/HeadModeling_r21/bin/*_cuda
+examples/HeadModeling_r21/bin/*_omp

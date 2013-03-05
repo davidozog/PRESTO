@@ -40,9 +40,10 @@ public class TestClass implements java.io.Serializable {
     return T;
   }
 
-  public TestClass TestKernel2(TestClass T1){
+  public TestClass TestKernel2(TestClass T1, String s){
     this.a = 7*T1.a;
     this.b = 7*T1.b;
+    System.out.println(s);
     return this;
   }
 
@@ -66,20 +67,17 @@ public class TestClass implements java.io.Serializable {
       TArrayIn[i] = new TestClass (i, i+numTasks);
     }
 
-    SystemCall sys_call = new SystemCall();
-    String uid = sys_call.callUID();
-
-    System.out.println("hi " + uid);
+    String TShared = "hi.";
     
-//    M.Launch();
-//    TArrayOut = M.SendJobsToWorkers("TestKernel2", TArrayIn);
-//
-//    for (int i=0; i<numTasks; i++) {
-//      System.out.println("Final Results #"+Integer.toString(i) +" are: " + 
-//      Integer.toString(TArrayOut[i].a) + " " + Float.toString(TArrayOut[i].b));
-//    }
-//
-//    M.Destroy();
+    M.Launch();
+    TArrayOut = M.SendJobsToWorkers("TestKernel2", TArrayIn, TShared);
+
+    for (int i=0; i<numTasks; i++) {
+      System.out.println("Final Results #"+Integer.toString(i) +" are: " + 
+      Integer.toString(TArrayOut[i].a) + " " + Float.toString(TArrayOut[i].b));
+    }
+
+    M.Destroy();
     
   }
 

@@ -30,6 +30,9 @@ class Worker {
 
     out.println("alive");
 
+    SystemCall sys_call = new SystemCall();
+    String uid = sys_call.callUID();
+
     while ( true ) {
 
       try {
@@ -44,7 +47,12 @@ class Worker {
 
         String[] splits = fromClient.split(",");
 
-        /* De-serialize the data file */
+        /* De-serialize the shared data file */
+        FileInputStream s_in = new FileInputStream ("/dev/shm/."+uid+"_sh.mat");
+        ObjectInputStream sobj_in = new ObjectInputStream (s_in);
+        Object sobj = sobj_in.readObject();
+
+        /* De-serialize the split data files */
         FileInputStream f_in = new FileInputStream (splits[3]);
         ObjectInputStream obj_in = new ObjectInputStream (f_in);
         Object obj = obj_in.readObject();
@@ -60,8 +68,12 @@ class Worker {
           /* Note: this is for a method with no params: */
           //method = obj.getClass().getMethod(splits[0]);
 
-          /* Note: this is for a method with a class param: */
-          method = obj.getClass().getMethod(splits[0], obj.getClass());
+          /* Note: this is for a method with a single class param: */
+          //method = obj.getClass().getMethod(splits[0], obj.getClass());
+
+          /* Note: this is for a method with two class params: */
+          Class[] MY_PARAMS = new Class[] {obj.getClass(), sobj.getClass()};
+          method = obj.getClass().getMethod(splits[0], MY_PARAMS);
 
         } catch (SecurityException e) {
             System.out.println("SecurityException");
@@ -82,7 +94,10 @@ class Worker {
           //method.invoke(obj);
 
           /* Note: this is for a method with a class param: */
-          method.invoke(new_obj, obj);
+          //method.invoke(new_obj, obj);
+
+          /* Note: this is for a method with a two class params: */
+          method.invoke(new_obj, obj, sobj);
 
         } catch (IllegalArgumentException e) {
             System.out.println("IllegalArgumentException");
@@ -94,10 +109,10 @@ class Worker {
 
         } 
 
-        TestClass T = (TestClass)new_obj;
+        BarkBeetlePresto B = (BarkBeetlePresto)new_obj;
         
-        String r1 = Integer.toString(T.a);
-        String r2 = Float.toString(T.b);
+        String r1 = Integer.toString(B.randomSeed);
+        String r2 = Float.toString(B.pheromoneAttract);
 
         System.out.println("results: " + r1 + ", " + r2);
 
@@ -106,7 +121,7 @@ class Worker {
         ObjectOutputStream obj_out;
         String id, dataFilePath;
         id = splits[2];
-        dataFilePath = "/dev/shm/.jr_" + id + ".data";
+        dataFilePath = "/dev/shm/."+uid+"_r" + id + ".mat";
         f_out = new FileOutputStream(dataFilePath);
         obj_out = new ObjectOutputStream (f_out);
         obj_out.writeObject ( new_obj );

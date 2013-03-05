@@ -50,6 +50,9 @@ HEADERS            = Poisson.h CondObjFunc.h LeadField.h   HmUtil.h cond_class.h
 FOR_EXECUTABLE_CUDA = ./bin/for_cuda
 FOR_EXECUTABLE_OMP  = ./bin/for_omp
 
+PRESTO_FOR_EXECUTABLE_CUDA = ./bin/presto_for_cuda
+PRESTO_FOR_EXECUTABLE_OMP  = ./bin/presto_for_omp
+
 LFM_EXECUTABLE_CUDA = ./bin/lfm_cuda
 LFM_EXECUTABLE_OMP  = ./bin/lfm_omp
 
@@ -92,7 +95,7 @@ endif
 CUDA_MODULES  := $(MODULES) cuda/4.0
 
 
-all: for_cuda for_omp lfm_cuda lfm_omp cond_cuda cond_omp
+all: for_cuda for_omp presto_for_omp presto_for_cuda lfm_cuda lfm_omp cond_cuda cond_omp 
 	echo -e 'for_omp: $(MODULES)' > ./cfg/modules.txt
 	echo -e 'for_cuda: $(CUDA_MODULES)' >> ./cfg/modules.txt
 	echo -e 'lfm_omp: $(MODULES)' >> ./cfg/modules.txt
@@ -107,6 +110,14 @@ for_omp:
 for_cuda:
 	$(CUDA_MODULES);\
 	$(MAKE) $(FOR_EXECUTABLE_CUDA)
+
+presto_for_omp:
+	$(MODULES);\
+	$(MAKE) $(PRESTO_FOR_EXECUTABLE_OMP)
+
+presto_for_cuda:
+	$(CUDA_MODULES);\
+	$(MAKE) $(PRESTO_FOR_EXECUTABLE_CUDA)
 
 lfm_omp:
 	$(MODULES);\
@@ -128,6 +139,12 @@ $(FOR_EXECUTABLE_OMP):  $(FOR_OBJECTS_OMP) $(MAKEFILE)
 	$(CPP) $(CPP_LINK_OMP) $(FOR_OBJECTS_OMP) -o $@
 
 $(FOR_EXECUTABLE_CUDA):  $(FOR_OBJECTS_CUDA) $(MAKEFILE)
+	$(CPP) $(CPP_LINK_CUDA) $(FOR_OBJECTS_CUDA) -o $@
+
+$(PRESTO_FOR_EXECUTABLE_OMP):  $(FOR_OBJECTS_OMP) $(MAKEFILE) 
+	$(CPP) $(CPP_LINK_OMP) $(FOR_OBJECTS_OMP) -o $@
+
+$(PRESTO_FOR_EXECUTABLE_CUDA):  $(FOR_OBJECTS_CUDA) $(MAKEFILE)
 	$(CPP) $(CPP_LINK_CUDA) $(FOR_OBJECTS_CUDA) -o $@
 
 $(LFM_EXECUTABLE_OMP):  $(LFM_OBJECTS_OMP) $(MAKEFILE)
@@ -164,6 +181,7 @@ $(OMP_OBJ_DIR)/%.o  :  $(SOURCE_DIR)/%.c $(HEADERS)
 clean:
 	rm -f $(LFM_EXECUTABLE_CUDA) $(LFM_EXECUTABLE_OMP)\
 	 $(COND_EXECUTABLE_CUDA) \ $(COND_EXECUTABLE_OMP) \
-	$(FOR_EXECUTABLE_OMP) $(FOR_EXECUTABLE_CUDA)
+	$(FOR_EXECUTABLE_OMP) $(FOR_EXECUTABLE_CUDA)\
+	$(PRESTO_FOR_EXECUTABLE_OMP) $(PRESTO_FOR_EXECUTABLE_CUDA)
 	rm -f $(OMP_OBJ_DIR)/*.o $(CUDA_OBJ_DIR)/*.o 
 	rm -f *.o *.linkinfo *~

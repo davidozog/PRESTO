@@ -6,6 +6,7 @@
 %   
 %     addpath( 'add/your/path/')
 
+addpath ~/sand/matlab/
 
 % This adds <Presto_root>/src/matlab to the matlab search path: 
 PRESTO_ROOT=[fileparts(mfilename('fullpath')), filesep];

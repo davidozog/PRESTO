@@ -20,6 +20,7 @@ else
 
   tic
   parfor i=1:N
+  %for i=1:N
     [c(i) d(i)] = bessel_test( a(i), b, true );
   end
   toc

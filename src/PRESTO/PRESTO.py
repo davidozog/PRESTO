@@ -38,8 +38,7 @@ def launch_matlab(queue, worker_dict):
   # Without GUI:
   presto_mpath = os.path.join(PRESTO_DIR, 'presto_setpath.m')
 
-  p = subprocess.Popen(MATLAB_BIN + ' -nodesktop -nosplash -r \"run ' + presto_mpath + ';' + 
-                       worker_dict + '\"', shell=True)
+  p = subprocess.Popen(MATLAB_BIN + ' -nodesktop -nosplash -r \"run ' + presto_mpath + ';' + worker_dict + '\"', stdout=open('worker0.log', 'w'), stderr=open('worker0.err', 'w'), shell=True)
   # With GUI:
   #p = subprocess.Popen(MATLAB_BIN + ' -desktop -r \"'+ worker_dict + 
   #                     '\"', shell=True)
@@ -55,6 +54,12 @@ def launch_java(queue, worker_dict, java_app):
   # send kill signal to all workers
   q.put('kill')
 
+def launch_python(queue, worker_dict, pyprog):
+  p = subprocess.Popen(pyprog, stdout=open('worker0.log', 'w'), stderr=open('worker0.err', 'w'), shell=True)
+  queue.put('running')
+  p.communicate()
+  # send kill signal to all workers
+  q.put('kill')
 
 def master_shmem_initiailization():
   #try:
@@ -137,6 +142,10 @@ if (rank==0):
   elif interface == 'java':
     java_app = sys.argv[2]
     t = threading.Thread(target=launch_java, args=(q, worker_dict, java_app))
+  elif interface == 'python':
+    py_app = sys.argv[2]
+    t = threading.Thread(target=launch_python, args=(q, worker_dict, "python " + py_app))
+
   t.start()
 
   master_shmem_initiailization()
@@ -166,6 +175,7 @@ if (rank==0):
               if(DEBUG):print '     Master Connection :', addr
               break
             except:
+              print "no connection"
               continue
 
         # Get jobs from 'send_jobs_to_workers' call
@@ -195,6 +205,7 @@ if (rank==0):
             if(DEBUG):print '     master message is ' + mesg 
             if mesg == 'done\n' or mesg == 'kill\n':
               #TODO: reset 'persistent' flag here, I think
+              if(DEBUG):print "GOT DONE"
               break
             protocol = mesg.split(',')[1].strip()
             if protocol == 'NETWORK':
@@ -204,7 +215,7 @@ if (rank==0):
 
               mesg = mesg.strip() + ':' + mesg_dat + '\n'
 
-            if protocol == 'TMPFS':
+            if protocol == 'TMPFS' or protocol == 'SHELL':
               uid = get_uid()
               if(DEBUG):print 'TMPFS msg is ' + mesg.split(',')[3].strip()
               tmpfs_file = open(mesg.split(',')[3].strip(), 'rb')
@@ -222,7 +233,7 @@ if (rank==0):
             # If all workers are busy wait for a result and 
             # send new job to that worker.
             if len(running_jobs) == size-1:
-              print str(len(running_jobs)) + ' JOBS ARE RUNNING'
+              #print str(len(running_jobs)) + ' JOBS ARE RUNNING'
               if(DEBUG): 
                 print 'master waiting for a free worker...'
 
@@ -244,9 +255,16 @@ if (rank==0):
 
                 rq.send(mesg_data, type=mesg_jobid)
 
+              elif protocol == 'SHELL':
+                jobid = data.split(':')[0]
+                results_filename = data.split(':')[1]
+                if(DEBUG):print 'jobid:' + jobid
+                if(DEBUG):print 'results_fname:' + results_filename
+                cnn.sendall(data)
+
               elif protocol == 'TMPFS':
                 jobid = data[:data.find(':')]
-                print '   JOBID: ' + jobid + ' FINISHED'
+                #print '   JOBID: ' + jobid + ' FINISHED'
                 results_file = open(TMPFS_PATH +'.'+ uid + '_r' + jobid + '.mat', 'wb')
                 results_file.write(data[data.find(':')+1:])
                 results_file.close()
@@ -263,7 +281,6 @@ if (rank==0):
               running_jobs.append(master_status.source)
               master_status = MPI.Status()
             else:
-              #TODO: move TMPFS shared data load and send to here:
               tmpfs_filepath_shared = TMPFS_PATH + '.' + uid + '_sh.mat'
               tmpfs_file_shared = open(tmpfs_filepath_shared, 'rb')
               mesg_dat_shared = tmpfs_file_shared.read()
@@ -277,7 +294,7 @@ if (rank==0):
 
         # Wait for job completion 
         while len(running_jobs) > 0:
-          print str(len(running_jobs)) + ' JOBS ARE RUNNING'
+          #print str(len(running_jobs)) + ' JOBS ARE RUNNING'
           if(DEBUG): print 'master waiting for results...'
           data = mpiComm.recv(source=MPI.ANY_SOURCE, tag=RESULTS_TAG, status=master_status)
           #if(DEBUG):print 'GOT RESULT:' + data
@@ -294,9 +311,16 @@ if (rank==0):
 
             rq.send(mesg_data, type=mesg_jobid)
 
+          elif protocol == 'SHELL':
+            jobid = data.split(':')[0]
+            results_filename = data.split(':')[1]
+            if(DEBUG):print 'jobid:' + jobid
+            if(DEBUG):print 'results_fname:' + results_filename
+            cnn.sendall(data)
+
           elif protocol == 'TMPFS':
             jobid = data[:data.find(':')]
-            print '   JOBID: ' + jobid + ' FINISHED'
+            #print '   JOBID: ' + jobid + ' FINISHED'
             results_file = open(TMPFS_PATH + '.' + uid + '_r' + jobid + '.mat', 'wb')
             results_file.write(data[data.find(':')+1:])
             results_file.close()
@@ -312,7 +336,7 @@ if (rank==0):
 
         q.put('running')
 
-        if interface == 'java':
+        if interface == 'java' or interface =='python':
           firstrun = False
 
       if mesg == 'kill\n':
@@ -340,6 +364,8 @@ else:
     cmd = MATLAB_BIN + ' -nosplash -r "run ' + presto_mpath + '; mworker(\''+name+'\', '+srank+')" -nodesktop'
   elif interface == 'java':
     cmd = "java Worker " + name + " " + srank
+  elif interface == 'python':
+    cmd = "python " + os.path.join(PRESTO_DIR, "src/python/hm_worker.py") + " " +  name + " " + srank
   if(DEBUG):print "cmd is: " + cmd
   p = subprocess.Popen(cmd, stdout=open('worker'+srank+'.log', 'w'), stderr=open('worker'+srank+'.err', 'w'), shell=True)
 
@@ -378,7 +404,7 @@ else:
         semaphore.release()
         conn.sendall(mesg)
 
-      elif protocol == 'TMPFS':
+      elif protocol == 'TMPFS' or protocol == 'SHELL':
         worker_tmpfs_file = open(mesg.split(',')[3].strip(), 'wb')
         mesg_data_split = mesg.split(':::::')
         mesg = mesg.split(':')[0]
@@ -427,6 +453,11 @@ else:
           semaphore.release()
           data = data.strip() + ':' + shm_data
 
+        elif protocol == 'SHELL':
+          if(DEBUG): print 'results mesg is' + data
+          jobid = data.split(':')[0]
+          if(DEBUG): print 'jobid is:' + jobid
+
         elif protocol == 'TMPFS':
           if(DEBUG): print 'results file is' + data
           results_file = open(data.strip(), 'rb')
@@ -461,7 +492,8 @@ if(DEBUG):print 'kill is first ' + str(kill) + ' on rank ' + srank
 if (rank==0):
   sock.close()
   kill = 1
-  print 'You may now safely exit'
+  if interface == 'matlab':
+    print 'You may now safely exit'
 #if rank != 0:
 #  s.close()
 #  if(DEBUG):print 'killing ' + str(p.pid)

@@ -36,10 +36,13 @@ if args.engine == 'matlab':
 elif args.engine == 'java':
   # TODO: remove .class extension if there
   pyargs = args.engine + ' ' + args.app
+elif args.engine == 'python':
+  # TODO: remove .class extension if there
+  pyargs = args.engine + ' ' + args.app
 else:
   sys.stderr.write('Unrecognized computational engine\n')
 
-subprocess.call('module load python matlab mpi-tor/openmpi-1.4.5_gcc-4.4.6; source ' \
+subprocess.call('module load python matlab/r2012b mpi-tor/openmpi-1.4.5_gcc-4.4.6; source ' \
                  + '/home11/ozog/usr/python/bin/activate; mpiexec --hostfile ' \
                  + presto_hostfile + ' --mca btl_tcp_if_include torbr ' + '-n ' + args.n + ' python ' \
                  + presto_dir + '/src/PRESTO/PRESTO.py ' + pyargs, shell=True)

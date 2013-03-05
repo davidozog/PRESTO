@@ -9,6 +9,10 @@ import argparse
 parser = argparse.ArgumentParser(description='Launch an interactive PBS job.')
 parser.add_argument('-n', metavar='N', type=int, default=2,
                      help='the total number of nodes in the job')
+parser.add_argument('-ppn', metavar='PPN', type=int, default=12,
+                     help='the total number of processes per node')
+parser.add_argument('--node-type', metavar='NODETYPE', type=str, default='generic',
+                     help='the type of Aciss node (generic, gpu, fatnode, etc.)')
 parser.add_argument('--count', action='store_true', default=False,
                      help='if true count the number of available nodes')
 parser.add_argument('--enable-display', action='store_true', default=False,
@@ -17,19 +21,29 @@ args = parser.parse_args()
 
 
 # Find free nodes (TODO make a python module for this):
-command = 'get_free_nodes generic'
+command = 'get_free_nodes ' + args.node_type
 out = subprocess.check_output(command, shell=True)
 out = out.split()
+num_nodes_avail = len(out)
 if args.count:
-  print len(out)
+  print num_nodes_avail
   sys.exit(0)
 
+if num_nodes_avail < args.n:
+  print 'Only ' + str(len(out)) + ' nodes are availalble'
+  sys.exit(-1)
 
 # Create hostsfile and qsub command
 elif not args.enable_display:	
-  qsub_command = 'qsub -q generic -I -d $PWD -l walltime=24:00:00 -l nodes='
+  if args.node_type == 'mpi':
+    qsub_command = 'qsub -q clusterwide -I -d $PWD -l walltime=24:00:00 -l nodes='
+  else:
+    qsub_command = 'qsub -q ' + args.node_type + ' -I -d $PWD -l walltime=24:00:00 -l nodes='
 else:
-  qsub_command = 'qsub -q generic -I -X -d $PWD -l walltime=24:00:00 -l nodes='
+  if args.node_type == 'mpi':
+    qsub_command = 'qsub -q clusterwide -I -X -d $PWD -l walltime=24:00:00 -l nodes='
+  else:
+    qsub_command = 'qsub -q ' + args.node_type + ' -I -X -d $PWD -l walltime=24:00:00 -l nodes='
 
 presto_config_path = os.path.join(os.environ['HOME'], '.presto')
 if not os.path.exists(presto_config_path):
@@ -38,7 +52,7 @@ hostsfile = open(os.path.join(presto_config_path, 'presto_hosts'), 'w')
 
 notification = 'selecting nodes: '
 for nodename in out[:args.n]:
-  qsub_command += nodename + ':ppn=12+'
+  qsub_command += nodename + ':ppn='+str(args.ppn)+'+'
   notification += nodename + ', '
   hostsfile.write(nodename + ' max_slots=1\n')
 
@@ -46,6 +60,8 @@ hostsfile.close()
 qsub_command = qsub_command[:-1]
 notification = notification[:-2]
 
+if args.node_type == 'mpi':
+  qsub_command += ":mpi"
 
 # Launch PBS job:
 print notification

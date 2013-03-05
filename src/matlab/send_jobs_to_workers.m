@@ -1,7 +1,7 @@
 function [A B] = send_jobs_to_workers(remote_method, varargin)
 
   DEBUG = 0;
-  PPN = 12;
+  PPN = 1;
 
   nVarargs = length(varargin);
 
@@ -397,13 +397,12 @@ function [A B] = send_jobs_to_workers(remote_method, varargin)
       idx = str2num(idx);
       if parmode
         if bundlemode
-          skip
           if idx ~= num_jobs 
             A(skip*(idx-1)+1:skip*(idx-1)+skip) = ret1(1:skip);
             B(skip*(idx-1)+1:skip*(idx-1)+skip) = ret2(1:skip);
           else
-            A(skip*(idx-1)+1:total_tasks) = ret1(1:skip);
-            B(skip*(idx-1)+1:total_tasks) = ret2(1:skip);
+            A(skip*(idx-1)+1:total_tasks) = ret1(1:length(ret1));
+            B(skip*(idx-1)+1:total_tasks) = ret2(1:length(ret2));
           end
           
 %          for j=1:skip

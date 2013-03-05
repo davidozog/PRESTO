@@ -1,0 +1,6 @@
+for_omp:  module purge; module load mpi-tor/openmpi-1.4.5_gcc-4.4.6
+for_cuda:  module purge; module load mpi-tor/openmpi-1.4.5_gcc-4.4.6 cuda/4.0
+lfm_omp:  module purge; module load mpi-tor/openmpi-1.4.5_gcc-4.4.6
+lfm_cuda:  module purge; module load mpi-tor/openmpi-1.4.5_gcc-4.4.6 cuda/4.0
+cond_omp:  module purge; module load mpi-tor/openmpi-1.4.5_gcc-4.4.6
+cond_cuda:  module purge; module load mpi-tor/openmpi-1.4.5_gcc-4.4.6 cuda/4.0

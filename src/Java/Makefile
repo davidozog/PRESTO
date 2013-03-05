@@ -10,6 +10,7 @@ JC = javac
 CLASSES = \
 	SystemCall.java \
 	TestClass.java \
+	BarkBeetlePresto.java \
 	Master.java \
 	Worker.java
 	
