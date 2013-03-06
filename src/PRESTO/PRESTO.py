@@ -26,6 +26,8 @@ RESULTS_TAG = 4
 WORKER_PORT = 11110
 MASTER_PORT = 11112
 
+TOKEN_MAX = 1000
+
 JQKEY = 37408
 RQKEY = 48963
 
@@ -55,7 +57,8 @@ def launch_java(queue, worker_dict, java_app):
   q.put('kill')
 
 def launch_python(queue, worker_dict, pyprog):
-  p = subprocess.Popen(pyprog, stdout=open('worker0.log', 'w'), stderr=open('worker0.err', 'w'), shell=True)
+  #p = subprocess.Popen(pyprog, stdout=open('worker0.log', 'w'), stderr=open('worker0.err', 'w'), shell=True)
+  p = subprocess.Popen(pyprog, shell=True)
   queue.put('running')
   p.communicate()
   # send kill signal to all workers
@@ -160,6 +163,7 @@ if (rank==0):
   sock.bind(('localhost', MASTER_PORT))
   sock.listen(1)
   firstrun = True
+  protocol = 'DUMMY'
 
   while True:
     try:  
@@ -179,11 +183,11 @@ if (rank==0):
               continue
 
         # Get jobs from 'send_jobs_to_workers' call
-        mesg = ''
-        mesg_q = Queue()
+        if protocol!='DAG' or firstrun:
+          mesg = ''
+          mesg_q = Queue()
+          running_jobs = []   # rank of the workers with running jobs
         destination = 0
-        running_jobs = []   # rank of the workers with running jobs
-        #import pdb; pdb.set_trace()
         while mesg!='kill':
           if(DEBUG):print '     master waiting for work...'
           mesg = ''
@@ -215,7 +219,13 @@ if (rank==0):
 
               mesg = mesg.strip() + ':' + mesg_dat + '\n'
 
-            if protocol == 'TMPFS' or protocol == 'SHELL':
+            elif protocol == 'DAG':
+              if(DEBUG):print 'DAG msg is ' + mesg
+              tokenid = mesg.split(',')[2].strip()
+              mesg_dat = mesg.split(',')[4].strip()
+              desination = mesg.split(',')[3].strip()
+
+            elif protocol == 'TMPFS' or protocol == 'SHELL':
               uid = get_uid()
               if(DEBUG):print 'TMPFS msg is ' + mesg.split(',')[3].strip()
               tmpfs_file = open(mesg.split(',')[3].strip(), 'rb')
@@ -255,6 +265,14 @@ if (rank==0):
 
                 rq.send(mesg_data, type=mesg_jobid)
 
+              elif protocol == 'DAG':
+                jobid = data.split(':')[0]
+                dest_task = data.split(':')[1]
+                token_value = data.split(':')[2]
+                if(DEBUG):print 'jobid:' + jobid
+                if(DEBUG):print 'token_value:' + token_value
+                cnn.sendall(data)
+
               elif protocol == 'SHELL':
                 jobid = data.split(':')[0]
                 results_filename = data.split(':')[1]
@@ -280,15 +298,23 @@ if (rank==0):
               mpiComm.send(mesg, dest=master_status.source, tag=DO_WORK_TAG)
               running_jobs.append(master_status.source)
               master_status = MPI.Status()
-            else:
+
+            elif protocol == 'TMPFS' or protocol == 'SHELL':
               tmpfs_filepath_shared = TMPFS_PATH + '.' + uid + '_sh.mat'
               tmpfs_file_shared = open(tmpfs_filepath_shared, 'rb')
               mesg_dat_shared = tmpfs_file_shared.read()
               mesg = mesg.strip() + ':::::' + mesg_dat + ':::::' + mesg_dat_shared + '\n'
               tmpfs_file_shared.close()
-
-              mpiComm.send(mesg, dest=destination, tag=DO_WORK_TAG)
+          
+            mpiComm.send(mesg, dest=destination, tag=DO_WORK_TAG)
+            if protocol != 'DAG':
               running_jobs.append(destination)
+            else:
+              running_jobs.append(tokenid)
+
+            if protocol == 'DAG' and len(running_jobs) == size-1:
+              mesg_q.put('done')
+
           else:
             continue
 
@@ -299,7 +325,9 @@ if (rank==0):
           data = mpiComm.recv(source=MPI.ANY_SOURCE, tag=RESULTS_TAG, status=master_status)
           #if(DEBUG):print 'GOT RESULT:' + data
           if(DEBUG):print 'GOT RESULT'
-          running_jobs.remove(master_status.source)
+          if protocol != 'DAG':
+            running_jobs.remove(master_status.source)
+  
           master_status = MPI.Status()
 
           if protocol == 'NETWORK':
@@ -310,6 +338,19 @@ if (rank==0):
             mesg_jobid = int(data.split(':')[-2])
 
             rq.send(mesg_data, type=mesg_jobid)
+
+          elif protocol == 'DAG':
+            jobid = data.split(':')[0]
+            dest_task = data.split(':')[1]
+            token_value = data.split(':')[2]
+            running_jobs.remove(jobid)
+            if(DEBUG):print 'jobid:' + jobid
+            if(DEBUG):print 'token_value:' + token_value
+            if int(token_value) < TOKEN_MAX:
+              mesg_q.put('NEW_whatever,DAG,'+ jobid +','+ dest_task +','+ token_value +',\n')
+            else:
+              cnn.sendall(data+'\n')
+            #print 'token #'+ jobid + ' : ' + token_value
 
           elif protocol == 'SHELL':
             jobid = data.split(':')[0]
@@ -365,7 +406,7 @@ else:
   elif interface == 'java':
     cmd = "java Worker " + name + " " + srank
   elif interface == 'python':
-    cmd = "python " + os.path.join(PRESTO_DIR, "src/python/hm_worker.py") + " " +  name + " " + srank
+    cmd = 'python ' + os.path.join(PRESTO_DIR, 'src/python/rand_worker.py') + ' ' +  name + ' ' + srank + ' ' + str(size)
   if(DEBUG):print "cmd is: " + cmd
   p = subprocess.Popen(cmd, stdout=open('worker'+srank+'.log', 'w'), stderr=open('worker'+srank+'.err', 'w'), shell=True)
 
@@ -402,6 +443,12 @@ else:
         mapfile = mmap.mmap(memory.fd, memory.size)
         shmemUtils.write_to_memory(mapfile, mesg_data)
         semaphore.release()
+        conn.sendall(mesg)
+
+      elif protocol == 'DAG':
+        mesg_data_split = mesg.split(':::::')
+        mesg = mesg.split(':')[0]
+        if(DEBUG):print 'DAG worker mesg:' + mesg
         conn.sendall(mesg)
 
       elif protocol == 'TMPFS' or protocol == 'SHELL':
@@ -453,8 +500,11 @@ else:
           semaphore.release()
           data = data.strip() + ':' + shm_data
 
+        elif protocol == 'DAG':
+          if(DEBUG): print 'DAG results mesg is:' + data
+
         elif protocol == 'SHELL':
-          if(DEBUG): print 'results mesg is' + data
+          if(DEBUG): print 'results mesg is:' + data
           jobid = data.split(':')[0]
           if(DEBUG): print 'jobid is:' + jobid
 

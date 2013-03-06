@@ -1,7 +1,7 @@
 function [A B] = send_jobs_to_workers(remote_method, varargin)
 
   DEBUG = 0;
-  PPN = 1;
+  PPN = 12;
 
   nVarargs = length(varargin);
 
