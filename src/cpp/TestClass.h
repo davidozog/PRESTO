@@ -18,7 +18,8 @@ class TestClass {
     float getB();
     void setA(int);
     void setB(float);
-    TestClass * TestKernel(TestClass *);
+    TestClass * TestKernel1(TestClass *);
+    TestClass * TestKernel2();
 
 };
 

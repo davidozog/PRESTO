@@ -29,15 +29,8 @@ except:
   sys.stderr.write('Missing a Presto hostfile. Maybe you forgot the "interactive_job" command? (see README)\n')
   sys.exit(-1)
 
-if args.engine == 'matlab':
-  # TODO: remove .m extension if there
-  pyargs = args.engine + ' ' + args.app
-  print pyargs
-elif args.engine == 'java':
-  # TODO: remove .class extension if there
-  pyargs = args.engine + ' ' + args.app
-elif args.engine == 'python':
-  # TODO: remove .class extension if there
+if args.engine == 'matlab' or args.engine == 'java' or \
+   args.engine == 'python' or args.engine == 'cpp':
   pyargs = args.engine + ' ' + args.app
 else:
   sys.stderr.write('Unrecognized computational engine\n')

@@ -3,7 +3,6 @@
 using namespace std;
 
 TestClass::TestClass() {
-  cout << "constructed" << endl;
 }
 
 TestClass::TestClass(int i, float j) {
@@ -12,7 +11,6 @@ TestClass::TestClass(int i, float j) {
 }
 
 TestClass::~TestClass() {
-  cout << "destroyed" << endl;
 }
 
 int TestClass::getA() {
@@ -31,8 +29,14 @@ void TestClass::setB(float j) {
   this->b = j;
 }
 
-TestClass * TestClass::TestKernel(TestClass *T1){
+TestClass * TestClass::TestKernel1(TestClass *T1) {
   this->a = 7*(T1->getA());
   this->b = 7*(T1->getB());
+  return this;
+}
+
+TestClass * TestClass::TestKernel2() {
+  this->a = 7*(this->a);
+  this->b = 7*(this->b);
   return this;
 }

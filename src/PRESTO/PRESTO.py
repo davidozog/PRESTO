@@ -64,6 +64,14 @@ def launch_python(queue, worker_dict, pyprog):
   # send kill signal to all workers
   q.put('kill')
 
+def launch_cpp(queue, worker_dict, cppProg):
+  #p = subprocess.Popen(pyprog, stdout=open('worker0.log', 'w'), stderr=open('worker0.err', 'w'), shell=True)
+  p = subprocess.Popen(cppProg, shell=True)
+  queue.put('running')
+  p.communicate()
+  # send kill signal to all workers
+  q.put('kill')
+
 def master_shmem_initiailization():
   #try:
   #  semaphore = posix_ipc.Semaphore('MATSEM')
@@ -108,6 +116,53 @@ def get_uid():
   uid = uid[lft:rht]
   return uid
 
+def waitOnResults(conn, mpiComm, protocol):
+  data = conn.recv(512)
+  if(DEBUG):print 'W'+srank+':(finished/received): ' + data 
+  if len(data.strip()) > 1:
+
+    if protocol == 'NETWORK':
+      while True:
+        try:
+          semaphore = posix_ipc.Semaphore('MATSEM')
+          break
+        except:
+          #time.sleep(1)
+          continue
+      mesg_len = int(data.split(':')[-2])
+      jobid = int(data.split(':')[-1])
+      semaphore.acquire()
+      memory = posix_ipc.SharedMemory('MAT2SHM')
+      mapfile = mmap.mmap(memory.fd, memory.size)
+      os.close(memory.fd)
+      shm_data = shmemUtils.read_from_memory(mapfile, mesg_len)
+      semaphore.release()
+      data = data.strip() + ':' + shm_data
+
+    elif protocol == 'DAG':
+      if(DEBUG): print 'DAG results mesg is:' + data
+
+    elif protocol == 'SHELL':
+      if(DEBUG): print 'results mesg is:' + data
+      jobid = data.split(':')[0]
+      if(DEBUG): print 'jobid is:' + jobid
+
+    elif protocol == 'TMPFS':
+      if(DEBUG): print 'results file is' + data
+      results_file = open(data.strip(), 'rb')
+      idx = data.find('r')
+      jobid = data[idx+1:data.find('.',idx+1)]
+      data = jobid + ':' + results_file.read()
+
+    # Send results (filename) back to master:
+    mpiComm.send(data, dest=0, tag=RESULTS_TAG)
+
+    # See if the master has decided to die:
+    #mpiComm.Iprobe(source=0, tag=KILL_TAG, status=worker_status)
+    #if (worker_status.tag == KILL_TAG):
+    #  if(DEBUG):print 'KILL MESSAGE came from ' + str(worker_status.source)
+    #  kill = mpiComm.recv(source=worker_status.source, tag=worker_status.tag)
+
 
 # Initialize mpi4py:
 mpiComm = MPI.COMM_WORLD
@@ -148,6 +203,9 @@ if (rank==0):
   elif interface == 'python':
     py_app = sys.argv[2]
     t = threading.Thread(target=launch_python, args=(q, worker_dict, "python " + py_app))
+  elif interface == 'cpp':
+    cpp_app = sys.argv[2]
+    t = threading.Thread(target=launch_cpp, args=(q, worker_dict, cpp_app))
 
   t.start()
 
@@ -164,6 +222,8 @@ if (rank==0):
   sock.listen(1)
   firstrun = True
   protocol = 'DUMMY'
+  dag_d = {}
+  dag_d_num = 0
 
   while True:
     try:  
@@ -191,19 +251,19 @@ if (rank==0):
         while mesg!='kill':
           if(DEBUG):print '     master waiting for work...'
           mesg = ''
+          availableWorker = False
           if mesg_q.qsize() > 0:
             mesg = mesg_q.get() + '\n'
             fromq = True
           else:
             mesg = cnn.recv(8192)
             fromq = False
-          # why is 'filter' here?  
           mesg_split = filter(None, mesg.split('\n'))
           if not fromq:
             for m in mesg_split:
               if len(m) > 0 and (m) != mesg and m is not None:
                 mesg_q.put(m)
-          if mesg_q.qsize > 0 and not fromq:
+          if mesg_q.qsize() > 0 and not fromq:
             mesg = mesg_q.get() + '\n'
           if (len(mesg) > 0):
             if(DEBUG):print '     master message is ' + mesg 
@@ -223,23 +283,26 @@ if (rank==0):
               if(DEBUG):print 'DAG msg is ' + mesg
               tokenid = mesg.split(',')[2].strip()
               mesg_dat = mesg.split(',')[4].strip()
-              desination = mesg.split(',')[3].strip()
+              dag_destination = mesg.split(',')[3].strip()
 
             elif protocol == 'TMPFS' or protocol == 'SHELL':
               uid = get_uid()
-              if(DEBUG):print 'TMPFS msg is ' + mesg.split(',')[3].strip()
+              if(DEBUG):print 'TMPFS file is ' + mesg.split(',')[3].strip()
               tmpfs_file = open(mesg.split(',')[3].strip(), 'rb')
               mesg_dat = tmpfs_file.read()
               # TODO: Just broadcast shared data once per job pool...
               # TODO: And/or add flag to use persistent shared data on worker side
               tmpfs_file.close()
-                
 
             # Determine the rank of the next worker:
-            if (destination != size-1):
-              destination = (destination + 1) % size
+            if protocol != 'DAG':
+              if (destination != size-1):
+                destination = (destination + 1) % size
+              else:
+                destination = 1
             else:
-              destination = 1
+              destination = int(dag_destination)
+            
             # If all workers are busy wait for a result and 
             # send new job to that worker.
             if len(running_jobs) == size-1:
@@ -252,8 +315,8 @@ if (rank==0):
                                   status=master_status)
 
               if(DEBUG):print 'GOT EXTRA RESULT:' 
-
-              running_jobs.remove(master_status.source)
+              if protocol != 'DAG':
+                running_jobs.remove(master_status.source)
 
               if protocol == 'NETWORK':
                 result_mesg = ':'.join(data.split(':')[:-1]) + '\n'
@@ -269,9 +332,14 @@ if (rank==0):
                 jobid = data.split(':')[0]
                 dest_task = data.split(':')[1]
                 token_value = data.split(':')[2]
+                running_jobs.remove(jobid)
                 if(DEBUG):print 'jobid:' + jobid
                 if(DEBUG):print 'token_value:' + token_value
-                cnn.sendall(data)
+                if int(token_value) < TOKEN_MAX:
+                  mesg_q.put('NEW_whatever,DAG,'+ jobid +','+ dest_task +','+ token_value +',\n')
+                else:
+                  cnn.sendall(data+'\n')
+                #print 'token #'+ jobid + ' : ' + token_value
 
               elif protocol == 'SHELL':
                 jobid = data.split(':')[0]
@@ -295,9 +363,10 @@ if (rank==0):
 
               mesg = mesg.strip() + ':::::' + mesg_dat + ':::::persist\n'
 
-              mpiComm.send(mesg, dest=master_status.source, tag=DO_WORK_TAG)
-              running_jobs.append(master_status.source)
-              master_status = MPI.Status()
+              availableWorker = True
+              #mpiComm.send(mesg, dest=master_status.source, tag=DO_WORK_TAG)
+              #running_jobs.append(master_status.source)
+              #master_status = MPI.Status()
 
             elif protocol == 'TMPFS' or protocol == 'SHELL':
               tmpfs_filepath_shared = TMPFS_PATH + '.' + uid + '_sh.mat'
@@ -306,14 +375,32 @@ if (rank==0):
               mesg = mesg.strip() + ':::::' + mesg_dat + ':::::' + mesg_dat_shared + '\n'
               tmpfs_file_shared.close()
           
-            mpiComm.send(mesg, dest=destination, tag=DO_WORK_TAG)
             if protocol != 'DAG':
-              running_jobs.append(destination)
+              if availableWorker:
+                mpiComm.send(mesg, dest=master_status.source, tag=DO_WORK_TAG)
+                running_jobs.append(master_status.source)
+                master_status = MPI.Status()
+              else:
+                mpiComm.send(mesg, dest=destination, tag=DO_WORK_TAG)
+                running_jobs.append(destination)
             else:
-              running_jobs.append(tokenid)
+              if destination in dag_d:
+                dag_d[destination].append(mesg)
+              else:
+                dag_d[destination] = [mesg] 
+              dag_d_num += 1
 
-            if protocol == 'DAG' and len(running_jobs) == size-1:
-              mesg_q.put('done')
+              if dag_d_num == size-1:
+                for k,v in dag_d.iteritems():
+                  destination = int(v[0].split(',')[3].strip())
+                  mpiComm.send(v, dest=destination, tag=DO_WORK_TAG)
+                  #mpiComm.Isend(mesg, dest=destination, tag=DO_WORK_TAG)
+                  for item in v:
+                    tokenid = item.split(',')[2].strip()
+                    running_jobs.append(tokenid)
+                dag_d.clear()
+                dag_d_num = 0
+                mesg_q.put('done')
 
           else:
             continue
@@ -377,7 +464,7 @@ if (rank==0):
 
         q.put('running')
 
-        if interface == 'java' or interface =='python':
+        if interface != 'matlab':
           firstrun = False
 
       if mesg == 'kill\n':
@@ -407,6 +494,8 @@ else:
     cmd = "java Worker " + name + " " + srank
   elif interface == 'python':
     cmd = 'python ' + os.path.join(PRESTO_DIR, 'src/python/rand_worker.py') + ' ' +  name + ' ' + srank + ' ' + str(size)
+  elif interface == 'cpp':
+    cmd = os.path.join(PRESTO_DIR, 'src/cpp/cppWorker') + ' ' +  name + ' ' + srank + ' ' + str(size)
   if(DEBUG):print "cmd is: " + cmd
   p = subprocess.Popen(cmd, stdout=open('worker'+srank+'.log', 'w'), stderr=open('worker'+srank+'.err', 'w'), shell=True)
 
@@ -428,11 +517,15 @@ else:
   while (kill != 1):
     worker_status = MPI.Status()
     mesg = mpiComm.recv(source=0, tag=MPI.ANY_TAG, status=worker_status)
-    protocol = mesg.split(',')[1].strip()
+    try:
+      protocol = mesg.split(',')[1].strip()
+    except:
+      protocol = mesg[0].split(',')[1].strip()
+      
     if (worker_status.tag == DO_WORK_TAG):
 
-      #if(DEBUG):print 'W'+srank+':(sent): do_work ( ' + mesg + ' ) ' 
-      
+      need_results = True
+
       # Send byte array to Matlab worker via shmem
       if protocol == 'NETWORK':
         mesg_data = mesg.split(':')[-1].strip()
@@ -446,15 +539,24 @@ else:
         conn.sendall(mesg)
 
       elif protocol == 'DAG':
-        mesg_data_split = mesg.split(':::::')
-        mesg = mesg.split(':')[0]
-        if(DEBUG):print 'DAG worker mesg:' + mesg
-        conn.sendall(mesg)
+        if len(mesg) == 1:
+          mesg = mesg[0]
+          mesg = mesg.split(':')[0].strip()
+          if(DEBUG):print 'DAG worker mesg:' + mesg
+          conn.sendall(mesg)
+        else:
+          for i in range(0,len(mesg)):
+            job_mesg = mesg[i].split(':')[0].strip()
+            if(DEBUG):print 'DAG worker job_mesg:' + job_mesg 
+            conn.sendall(job_mesg)
+            waitOnResults(conn, mpiComm, protocol)
+          need_results = False
 
       elif protocol == 'TMPFS' or protocol == 'SHELL':
         worker_tmpfs_file = open(mesg.split(',')[3].strip(), 'wb')
         mesg_data_split = mesg.split(':::::')
         mesg = mesg.split(':')[0]
+        if(DEBUG):print 'TMPFS worker mesg:' + mesg
         worker_tmpfs_file.write(mesg_data_split[1])
         worker_tmpfs_file.close()
         if mesg_data_split[2] != 'persist\n':
@@ -476,55 +578,9 @@ else:
         # Send work message (func_name,'split_file.mat','shared_file.mat')
         conn.sendall(mesg)
 
-
       # Wait for results (filename):
-      data = conn.recv(512)
-      if(DEBUG):print 'W'+srank+':(finished/received): ' + data 
-      if len(data.strip()) > 1:
-
-        if protocol == 'NETWORK':
-          while True:
-            try:
-              semaphore = posix_ipc.Semaphore('MATSEM')
-              break
-            except:
-              #time.sleep(1)
-              continue
-          mesg_len = int(data.split(':')[-2])
-          jobid = int(data.split(':')[-1])
-          semaphore.acquire()
-          memory = posix_ipc.SharedMemory('MAT2SHM')
-          mapfile = mmap.mmap(memory.fd, memory.size)
-          os.close(memory.fd)
-          shm_data = shmemUtils.read_from_memory(mapfile, mesg_len)
-          semaphore.release()
-          data = data.strip() + ':' + shm_data
-
-        elif protocol == 'DAG':
-          if(DEBUG): print 'DAG results mesg is:' + data
-
-        elif protocol == 'SHELL':
-          if(DEBUG): print 'results mesg is:' + data
-          jobid = data.split(':')[0]
-          if(DEBUG): print 'jobid is:' + jobid
-
-        elif protocol == 'TMPFS':
-          if(DEBUG): print 'results file is' + data
-          results_file = open(data.strip(), 'rb')
-          idx = data.find('r')
-          jobid = data[idx+1:data.find('.',idx+1)]
-          data = jobid + ':' + results_file.read()
-
-        # Send results (filename) back to master:
-        mpiComm.send(data, dest=0, tag=RESULTS_TAG)
-
-        # See if the master has decided to die:
-        #mpiComm.Iprobe(source=0, tag=KILL_TAG, status=worker_status)
-        #if (worker_status.tag == KILL_TAG):
-        #  if(DEBUG):print 'KILL MESSAGE came from ' + str(worker_status.source)
-        #  kill = mpiComm.recv(source=worker_status.source, tag=worker_status.tag)
-      else:
-        continue
+      if need_results:
+        waitOnResults(conn, mpiComm, protocol)
 
     elif (worker_status.tag == KILL_TAG):
       if protocol == 'NETWORK':

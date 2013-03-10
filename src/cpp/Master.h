@@ -1,9 +1,10 @@
 #ifndef __MASTER_H__
 #define __MASTER_H__
 
-#include "TestClass.h"
-
+#include "env.hpp"
 #include <iostream>
+#include <algorithm>
+#include <vector>
 #include <fstream>
 #include <stdlib.h>
 #include <stdio.h>
@@ -15,19 +16,34 @@
 using namespace std;
 
 #define MASTER_PORT 11112
+#define TMPFS_PATH "/dev/shm/"
+
+static inline string &ltrim(string &s) {
+  s.erase(s.begin(), find_if(s.begin(), s.end(), not1(ptr_fun<int, int>(isspace))));
+  return s;
+}
+
+static inline string &rtrim(string &s) {
+  s.erase(find_if(s.rbegin(), s.rend(), not1(ptr_fun<int, int>(isspace))).base(), s.end());
+  return s;
+}
+
+static inline string &trim(string &s) {
+  return ltrim(rtrim(s));
+}
+
 
 template <class T, unsigned N>
 class Master {
 
   private:
-    int sockfd, newsockfd;
+    int sockfd;
 
   public:
     Master();
     ~Master();
     void Launch();
     void Destroy();
-    //T* SendJobsToWorkers(const char *method, T(&)[N]);
     void SendJobsToWorkers(const char *method, T *, T *);
 
 };
@@ -47,10 +63,10 @@ void Master<T, N>::Launch() {
   int portno, optval, optlen;
   int n;
   char *optval2;
-  socklen_t clilen;
   struct sockaddr_in serv_addr, cli_addr;
 
-  char mesg[128];
+  int MESGSIZE = 128;
+  char mesg[MESGSIZE];
 
   sockfd = socket(AF_INET, SOCK_STREAM, 0);
   optval = 1;
@@ -60,126 +76,91 @@ void Master<T, N>::Launch() {
   serv_addr.sin_family = AF_INET;
   serv_addr.sin_addr.s_addr = INADDR_ANY;
   serv_addr.sin_port = htons(MASTER_PORT);
-  if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-    perror("ERROR on binding"); exit(-1);
-  }
-  listen(sockfd,5);
-  clilen = sizeof(cli_addr);
 
-  newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
-  if ( newsockfd < 0 ) { perror("ERROR on accept"); exit(-1); }
+  if (connect(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) 
+    perror("ERROR connecting");
 
-  strcpy(mesg, "Hello there");
-
-  n = write(newsockfd, mesg, strlen(mesg));
-  if (n < 0) { perror("ERROR writing to socket"); exit(-1); }
-
-/*
-    String fromClient;
-    sock = new Socket("localhost", 11112);
-    
-    System.out.println("Hello there");
-    
-    in = new BufferedReader(new InputStreamReader (sock.getInputStream()));
-    out = new PrintWriter(sock.getOutputStream(), true);
-
-*/
 }
 
 template <class T, unsigned N>
 void Master<T, N>::Destroy() {
-  close(newsockfd);
+  int n = write(sockfd, "kill\n", strlen("kill\n"));
+  if (n < 0) { perror("ERROR writing to socket"); exit(-1); }
   close(sockfd);
 }
 
 template <class T, unsigned N>
-//T* Master<T, N>::SendJobsToWorkers(const char *method, T (&Obj)[N]) {
 void Master<T, N>::SendJobsToWorkers(const char *method, T *InObj, T *OutObj) {
 
-  cout << "N is " << N << endl;
-  int n;
+  int MESGSIZE = 256;
+  int n, jobsAccountedFor=0, idxr, idxm, jobid;
   char id[8];
   char filename[64];
-  char mesg[256];
+  char mesg[MESGSIZE];
 
+  Env env;
+  string uid = env.getUid();
+
+  /* Shared data */
+  string shared_filename = TMPFS_PATH + uid + "_sh.mat";
+  ofstream ofsh(shared_filename.c_str(), ios::binary);
+  ofsh.write("0", sizeof(int));
+  ofsh.close();
+
+  string split_filename_prefix = TMPFS_PATH + uid + "_sp_";
   
   for ( int i=0; i<N; i++ ) {
-    strcpy(filename, "/dev/shm/.cv_");
+    strcpy(filename, split_filename_prefix.c_str());
     sprintf(id, "%d", i);
     strcat(filename, id);
     strcat(filename, ".bin");
-    cout << "filename:" << filename << endl;
     ofstream ofs(filename, ios::binary);
     ofs.write((char *)&InObj[i], sizeof(InObj[i]));
+    ofs.close();
 
+    bzero(mesg, MESGSIZE);
     strcpy(mesg, method); 
     strcat(mesg, ",TMPFS,");
     strcat(mesg, id);
     strcat(mesg, ",");
     strcat(mesg, filename);
-    strcat(mesg, ",");
+    strcat(mesg, ",\n");
 
-    cout << "mesg is: " << mesg << endl;
-
-    n = write(newsockfd, mesg, strlen(mesg));
+    n = write(sockfd, mesg, strlen(mesg));
     if (n < 0) { perror("ERROR writing to socket"); exit(-1); }
 
     memset(filename, '\0', strlen(filename));
-    memset(mesg, '\0', strlen(mesg));
 
   }
 
-//     out.println(mesg);
-//
-//   }
-//
-//   out.println("done");
-//
-//   String fromMPI, strIdx;
-//   int idx;
-//
-//
-//   /* Wait for all the results */
-//   int jobsAccountedFor = 0;
-//   
-//   while ( jobsAccountedFor < numTasks ) {
-//
-//     try {
-//
-//       fromMPI = in.readLine();
-//     
-//     }  catch (Exception e) {
-//        continue;
-//     }
-//
-//     System.out.println("fromMPI is:" + fromMPI);
-//     if( fromMPI!= null && !fromMPI.isEmpty() ) {
-//       jobsAccountedFor = jobsAccountedFor + 1;
-//       System.out.println ("Got string " + fromMPI);
-//
-//       /* De-serialize the data file */
-//       FileInputStream f_in = new FileInputStream (fromMPI);
-//       ObjectInputStream obj_in = new ObjectInputStream (f_in);
-//       Object obj = obj_in.readObject();
-//       
-//       /* Get job ID from filename */
-//       String[] splits = fromMPI.split("_");
-//       System.out.println("this is :" + splits[1].substring(0, splits[1].indexOf(".")));
-//       strIdx = splits[1].substring(0, splits[1].indexOf("."));
-//       idx = Integer.parseInt(strIdx);
-//
-//       Obj[idx] = (T)obj;
-//
-//     }
-//
-//   }
-//
-//   return Obj;
-//
+  bzero(mesg, MESGSIZE);
+  strcpy(mesg, "done"); 
+  n = write(sockfd, mesg, strlen(mesg));
+  if (n < 0) { perror("ERROR writing to socket"); exit(-1); }
 
-  for (int i=0; i<N; i++) {
-    OutObj[i].TestKernel(&InObj[i]);
+  /* Gather the serialized results and load them */
+  while ( jobsAccountedFor < N ) {
+    
+    bzero(mesg, MESGSIZE);
+    n = read(sockfd, mesg, MESGSIZE);
+
+    jobsAccountedFor++;
+
+    string cppmesg = string(mesg);
+    ifstream ifs(trim(cppmesg).c_str(), ios::binary);
+
+    idxr = cppmesg.find("_r");
+    idxm = cppmesg.find(".mat");
+    
+    memset(id, '\0', 8*sizeof(char));
+    memcpy(id, &mesg[idxr+2], (idxm-idxr-2)*sizeof(char));
+    jobid = atoi(id);
+
+    ifs.read((char *)&OutObj[jobid], sizeof(T));
+
   }
+
+  return;
 
 }
 

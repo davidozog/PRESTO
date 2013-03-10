@@ -30,6 +30,7 @@ while True:
     break
 
   params = mesg.split(',')
+  print params
   jobid = params[2].strip()
   token = int(params[4].strip())
   dest_task = random.randint(1,size-1)

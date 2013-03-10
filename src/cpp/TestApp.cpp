@@ -7,42 +7,34 @@ using namespace std;
 int main( int argc, char **argv ) {
 
   const unsigned numTasks = 3;
-  cout << "hi dave" << endl;
 
   Master<TestClass, numTasks> M;
 
   TestClass *TArrayIn = new TestClass[numTasks];
   TestClass *TArrayOut = new TestClass[numTasks];
 
+  cout << "Input:" << endl;
   for (int i=0; i<numTasks; i++) {
     TArrayIn[i].setA(i);
     TArrayIn[i].setB((float)(i+numTasks));
-    cout << TArrayIn[i].getA() << " " << TArrayIn[i].getB() << endl;
+    cout << "\t" << TArrayIn[i].getA() << " " << TArrayIn[i].getB() << endl;
   }
+  cout << endl;
     
   M.Launch();
 
-  M.SendJobsToWorkers("TestKernel", TArrayIn, TArrayOut);
-  cout << "hunky dory" << endl;
+  M.SendJobsToWorkers("TestKernel1", TArrayIn, TArrayOut);
 
+  cout << "Output:" << endl;
   for (int i=0; i<numTasks; i++) {
-    cout << TArrayOut[i].getA() << " " << TArrayOut[i].getB() << endl;
+    cout << "\t" << TArrayOut[i].getA() << " " << TArrayOut[i].getB() << endl;
   }
+  cout << endl;
 
-/*
-
-    for (int i=0; i<numTasks; i++) {
-      System.out.println("Final Results #"+Integer.toString(i) +" are: " + 
-      Integer.toString(TArrayOut[i].a) + " " + Float.toString(TArrayOut[i].b));
-    }
-
-*/
 
   M.Destroy();
 
   delete[] TArrayIn;
-  cout << "ok..." << endl;
   delete[] TArrayOut;
     
-  }
-
+}
