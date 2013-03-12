@@ -13,7 +13,7 @@ import sysv_ipc
 import mmap
 import shmemUtils
 
-DEBUG = False
+DEBUG = True
 
 #MATLAB_BIN = '/usr/local/packages/MATLAB/R2011b/bin/matlab'
 MATLAB_BIN = os.environ['MATLAB'] + '/bin/matlab'
@@ -66,6 +66,7 @@ def launch_python(queue, worker_dict, pyprog):
 
 def launch_cpp(queue, worker_dict, cppProg):
   #p = subprocess.Popen(pyprog, stdout=open('worker0.log', 'w'), stderr=open('worker0.err', 'w'), shell=True)
+  print 'launching: ' + cppProg
   p = subprocess.Popen(cppProg, shell=True)
   queue.put('running')
   p.communicate()
@@ -205,6 +206,8 @@ if (rank==0):
     t = threading.Thread(target=launch_python, args=(q, worker_dict, "python " + py_app))
   elif interface == 'cpp':
     cpp_app = sys.argv[2]
+    if cpp_app.find('presto_for_') >= 0:
+      cpp_app = sys.argv[2] + ' ' + sys.argv[3]
     t = threading.Thread(target=launch_cpp, args=(q, worker_dict, cpp_app))
 
   t.start()
@@ -224,6 +227,7 @@ if (rank==0):
   protocol = 'DUMMY'
   dag_d = {}
   dag_d_num = 0
+
 
   while True:
     try:  
@@ -493,7 +497,7 @@ else:
   elif interface == 'java':
     cmd = "java Worker " + name + " " + srank
   elif interface == 'python':
-    cmd = 'python ' + os.path.join(PRESTO_DIR, 'src/python/rand_worker.py') + ' ' +  name + ' ' + srank + ' ' + str(size)
+    cmd = 'python ' + os.path.join(PRESTO_DIR, 'src/python/py_worker.py') + ' ' +  name + ' ' + srank + ' ' + str(size)
   elif interface == 'cpp':
     cmd = os.path.join(PRESTO_DIR, 'src/cpp/cppWorker') + ' ' +  name + ' ' + srank + ' ' + str(size)
   if(DEBUG):print "cmd is: " + cmd

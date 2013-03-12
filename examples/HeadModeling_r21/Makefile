@@ -7,6 +7,9 @@ CC   = gcc
 CPP_LINK_OMP  = -L/usr/lib64/ -L/usr/lib64/libblas.so.3.0.3 -llapack -fopenmp
 CPP_LINK_CUDA = $(CPP_LINK_OMP) -fPic -lcudart -L/usr/local/packages/cuda/4.0/lib64
 
+PRESTO_LINK_OMP = $(CPP_LINK_OMP) -I../../src/cpp -L../../src/cpp -lpresto -lboost_serialization
+PRESTO_LINK_CUDA = $(CPP_LINK_CUDA) $(PRESTO_LINK_OMP)
+
 CPP_COMPILE_OMP    = -I $(SOURCE_DIR) -fopenmp -O3
 CPP_COMPILE_CUDA   =    $(CPP_COMPILE_OMP) -D CUDA_ENABLED 
 CC_COMPILE_OMP     =    $(CPP_COMPILE_OMP)  
@@ -20,8 +23,14 @@ OMP_OBJ_DIR        = ./objects/omp/
 FOR_OBJECTS       = Poisson.o PoissonAdi.o PoissonVai.o HeadModel.o  \
 		    forward_main.o HmUtil.o
 
+FOR_PRESTO_OBJECTS       = Poisson.o PoissonAdi.o PoissonVai.o HeadModel.o  \
+		    presto_forward_main.o HmUtil.o HmTask.o
+
 _FOR_OBJECTS_CUDA = $(FOR_OBJECTS)  solve_adi_cuda_bmd.o  solve_adi_cuda.o poisson_vai_cuda.o reduction.o
 _FOR_OBJECTS_OMP  = $(FOR_OBJECTS)  
+
+_PRESTO_FOR_OBJECTS_CUDA = $(FOR_PRESTO_OBJECTS)  solve_adi_cuda_bmd.o  solve_adi_cuda.o poisson_vai_cuda.o reduction.o
+_PRESTO_FOR_OBJECTS_OMP  = $(FOR_PRESTO_OBJECTS)  
 
 LFM_OBJECTS       = lfm_main.o Poisson.o PoissonAdi.o LeadField.o HeadModel.o \
                     PoissonVai.o HmUtil.o
@@ -38,6 +47,9 @@ _COND_OBJECTS_OMP  = $(COND_OBJECTS)
 FOR_OBJECTS_CUDA  = $(patsubst %, $(CUDA_OBJ_DIR)/%, $(_FOR_OBJECTS_CUDA))
 FOR_OBJECTS_OMP   = $(patsubst %, $(OMP_OBJ_DIR)/%, $(_FOR_OBJECTS_OMP))
 
+PRESTO_FOR_OBJECTS_CUDA  = $(patsubst %, $(CUDA_OBJ_DIR)/%, $(_PRESTO_FOR_OBJECTS_CUDA))
+PRESTO_FOR_OBJECTS_OMP   = $(patsubst %, $(OMP_OBJ_DIR)/%, $(_PRESTO_FOR_OBJECTS_OMP))
+
 LFM_OBJECTS_CUDA  = $(patsubst %, $(CUDA_OBJ_DIR)/%, $(_LFM_OBJECTS_CUDA))
 LFM_OBJECTS_OMP   = $(patsubst %, $(OMP_OBJ_DIR)/%, $(_LFM_OBJECTS_OMP))
 
@@ -45,7 +57,7 @@ COND_OBJECTS_CUDA  = $(patsubst %, $(CUDA_OBJ_DIR)/%, $(_COND_OBJECTS_CUDA))
 COND_OBJECTS_OMP   = $(patsubst %, $(OMP_OBJ_DIR)/%, $(_COND_OBJECTS_OMP))
 
 HEADERS            = Poisson.h CondObjFunc.h LeadField.h   HmUtil.h cond_class.h\
-                     simplex.h OptimMethod.h paral_sa.h PoissonVai.h HeadModel.h ObjFunc.h
+                     simplex.h OptimMethod.h paral_sa.h PoissonVai.h HeadModel.h ObjFunc.h HmTask.h
 
 FOR_EXECUTABLE_CUDA = ./bin/for_cuda
 FOR_EXECUTABLE_OMP  = ./bin/for_omp
@@ -83,6 +95,7 @@ MODULES := $(MODULES) module purge; module load mpi-pbs/openmpi-1.4.3_gcc-4.3.5-
 endif
 
 ifeq ($(HOSTNAME), hn1)
+MODULES := source /usr/local/packages/modules/init/bash;
 MODULES := $(MODULES) module purge; module load mpi-tor/openmpi-1.4.5_gcc-4.4.6
 #MODULES := $(MODULES) module purge; module load mpi-tor/openmpi-1.5.4_gcc-4.5.3
 endif
@@ -141,11 +154,11 @@ $(FOR_EXECUTABLE_OMP):  $(FOR_OBJECTS_OMP) $(MAKEFILE)
 $(FOR_EXECUTABLE_CUDA):  $(FOR_OBJECTS_CUDA) $(MAKEFILE)
 	$(CPP) $(CPP_LINK_CUDA) $(FOR_OBJECTS_CUDA) -o $@
 
-$(PRESTO_FOR_EXECUTABLE_OMP):  $(FOR_OBJECTS_OMP) $(MAKEFILE) 
-	$(CPP) $(CPP_LINK_OMP) $(FOR_OBJECTS_OMP) -o $@
+$(PRESTO_FOR_EXECUTABLE_OMP):  $(PRESTO_FOR_OBJECTS_OMP) $(MAKEFILE) 
+	$(CPP) $(PRESTO_LINK_OMP) $(PRESTO_FOR_OBJECTS_OMP) -o $@
 
-$(PRESTO_FOR_EXECUTABLE_CUDA):  $(FOR_OBJECTS_CUDA) $(MAKEFILE)
-	$(CPP) $(CPP_LINK_CUDA) $(FOR_OBJECTS_CUDA) -o $@
+$(PRESTO_FOR_EXECUTABLE_CUDA):  $(PRESTO_FOR_OBJECTS_CUDA) $(MAKEFILE)
+	$(CPP) $(PRESTO_LINK_CUDA) $(PRESTO_FOR_OBJECTS_CUDA) -o $@
 
 $(LFM_EXECUTABLE_OMP):  $(LFM_OBJECTS_OMP) $(MAKEFILE)
 	$(CPP) $(CPP_LINK_OMP) $(LFM_OBJECTS_OMP) -o $@

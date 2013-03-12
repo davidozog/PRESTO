@@ -25,7 +25,7 @@ output_name_prefix      pl_bk_adicudaiso_1mm
 ################ Forward solver parameters 
 time_step               2.5
 tol                     0.0001
-max_iter                3000
+max_iter                10
 
 tissues                 air   wm   skull  scalp  csf    gm    iair 
 tissues_conds           0.0  .35    .018  .44    1.79   .25   0.0  

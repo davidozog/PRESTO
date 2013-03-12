@@ -9,7 +9,6 @@ using namespace std;
 string Env::getUserName() {
   register struct passwd *pw;
   register uid_t uid;
-  int c;
 
   uid = geteuid ();
   pw = getpwuid (uid);

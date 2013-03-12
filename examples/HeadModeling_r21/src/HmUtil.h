@@ -6,9 +6,14 @@
 #include <mpi.h>
 #include <map>
 
+#include <boost/serialization/base_object.hpp>
+#include <boost/serialization/map.hpp>
+#include <boost/serialization/vector.hpp>
+
 using std::string ;
 using std::vector ;
 using std::map;
+
 
 namespace HmUtil
 {

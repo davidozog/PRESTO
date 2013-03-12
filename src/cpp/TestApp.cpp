@@ -8,7 +8,7 @@ int main( int argc, char **argv ) {
 
   const unsigned numTasks = 3;
 
-  Master<TestClass, numTasks> M;
+  Master<TestClass, TestClass, numTasks> M;
 
   TestClass *TArrayIn = new TestClass[numTasks];
   TestClass *TArrayOut = new TestClass[numTasks];

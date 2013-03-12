@@ -32,6 +32,7 @@ except:
 if args.engine == 'matlab' or args.engine == 'java' or \
    args.engine == 'python' or args.engine == 'cpp':
   pyargs = args.engine + ' ' + args.app
+  print 'app:' + args.app
 else:
   sys.stderr.write('Unrecognized computational engine\n')
 

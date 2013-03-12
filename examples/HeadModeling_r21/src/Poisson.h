@@ -20,6 +20,8 @@
 #include "HeadModel.h"
 #include "grid_point.h"
 
+#include <boost/serialization/base_object.hpp>
+
 using std::ostream;
 using std::cout;
 using std::map;
@@ -103,6 +105,13 @@ class Poisson {
   
   //!abstract class constructors are private
   Poisson();
+
+  friend class boost::serialization::access;
+  template<class Archive>
+  void serialize(Archive & ar, const unsigned int version){
+    ar & mNx & mNy & mNz; // and so on ...
+  }
+
 
 public:
 

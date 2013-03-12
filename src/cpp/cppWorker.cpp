@@ -35,11 +35,10 @@ int main( int argc, char **argv ) {
 
   int sockfd;
 
-  int portno, optval, optlen;
+  int optval;
   int n;
-  char *optval2;
 //  socklen_t clilen;
-  struct sockaddr_in serv_addr, cli_addr;
+  struct sockaddr_in serv_addr;
 
   int MESGSIZE = 128;
   char mesg[MESGSIZE];
