@@ -21,8 +21,10 @@ cnn.connect(('localhost', MASTER_PORT))
 # a worker.  For now, just feed two input files:
 
 infiles = []
-infiles.append('./pair-i103s45.hm')
-infiles.append('./pair-i104s57.hm')
+#infiles.append('./pair-i103s45.hm')
+#infiles.append('./pair-i104s57.hm')
+infiles.append('./cond_inputfile1.hm')
+infiles.append('./cond_inputfile2.hm')
 mesg = []
 running_jobs = []
 

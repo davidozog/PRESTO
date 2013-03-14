@@ -30,11 +30,15 @@ except:
   sys.exit(-1)
 
 if args.engine == 'matlab' or args.engine == 'java' or \
-   args.engine == 'python' or args.engine == 'cpp':
+   args.engine == 'python' or args.engine == 'cpp' or \
+   args.engine == 'cppvis':
   pyargs = args.engine + ' ' + args.app
   print 'app:' + args.app
 else:
   sys.stderr.write('Unrecognized computational engine\n')
+
+if args.engine == 'cppvis':
+  args.n = str( int(args.n) + 1 )
 
 subprocess.call('module load python matlab/r2012b mpi-tor/openmpi-1.4.5_gcc-4.4.6; source ' \
                  + '/home11/ozog/usr/python/bin/activate; mpiexec --hostfile ' \

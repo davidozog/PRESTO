@@ -34,9 +34,13 @@ while True:
   out = subprocess.check_output('which HMtools', shell=True)
   print "out: " + out
   pout = subprocess.check_output('HMtools ' + infile + ' ' + myhost, shell=True) 
-  print 'pout is:' + pout
-  pstat = subprocess.check_output(pout, shell=True) 
+  print 'pout is:' + pout.strip()
+  #pstat = subprocess.check_output(pout.strip(), stderr=open('myerr.err','w'), shell=True) 
+  pstat = subprocess.check_output(pout.strip(), stderr=subprocess.STDOUT, shell=True) 
+
   log_file = pout.split('>')[-2].split()[0]
+
+  print 'log_file is ' + log_file
 
   try:
     with open(log_file) as f: pass
@@ -44,6 +48,5 @@ while True:
     print 'Oh dear.'
   
   cnn.send(jobid + ':' + log_file)
-
   
 cnn.close()

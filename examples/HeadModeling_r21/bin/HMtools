@@ -153,6 +153,9 @@ class HMtools:
             pbs_in += "mpirun %s -np %d %s %s  1>%s 2>&1 \n" % \
                       (self.mpiarg, self.num_procs, self.prog_full_path, \
                        self.prog_arg, log_fname)
+            self.run_cmd = "%s %s 1>%s 2>&1 \n" % \
+                      (self.prog_full_path, \
+                       self.prog_arg, log_fname)
 
         fid = open(self.pbs_shell_fname, 'w')
         fid.write(pbs_in)
@@ -324,7 +327,7 @@ class HMtools:
             
             #runstring = "qsub -q %s %s" % (self.queue, self.pbs_shell_fname)
             runstring = self.run_cmd
-            #print("Executing command:\n %s\n" % runstring)
+            print("Executing command:\n %s\n" % runstring)
             status = os.system(runstring)
             if status:
                 raise Exception("failed to submit the job %d " % status)
@@ -336,8 +339,9 @@ class HMtools:
                 #import pdb; pdb.set_trace()
     
                 modules = self.pbs_modules.split()
+                #command = 'module purge;'
                 command = 'module purge;'
-                for m in modules:
+                for m in modules[2:]:
                   command += 'module load ' + m + ';'
                 command += self.run_cmd
                 #p = subprocess.check_call(command, stdout=subprocess.PIPE,

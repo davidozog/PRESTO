@@ -28,6 +28,9 @@ class CurrentInjecData{
   ~CurrentInjecData();
   CurrentInjecData(const string& rEitData);
   int LoadEitData (const string& rEitData);
+  vector<float> getEitData();
+  vector<int> getExcludeElectrodes();
+
 };
 
 #endif

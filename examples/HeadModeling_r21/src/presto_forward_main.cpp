@@ -16,6 +16,8 @@
 #include "../../../src/cpp/Master.h"
 #include "../../../src/cpp/TestClass.h"
 
+#include <boost/lexical_cast.hpp>
+
 using namespace std;
 
 /* TODO
@@ -371,17 +373,30 @@ int main(int argc, char** argv){
     }
   }
 
+  /* Here I want to create 100 or so different parameter vectors, 
+     each with a different value for the skull conductivity */
+
   HmTask *inputs;
   HmTask *outputs;
 
-  inputs = new HmTask[2];
-  outputs = new HmTask[2];
+  const unsigned numTasks = 10;
+  inputs = new HmTask[numTasks];
+  outputs = new HmTask[numTasks];
+  string skull_str;
+  float skull_flt;
 
-  inputs[0].params = parameters;
-  inputs[1].params = parameters;
+  for (int i=0; i<numTasks; i++) {
+    cout << parameters["tissues_conds"][2] << endl;
+    inputs[i].params = parameters;
+    skull_str = parameters["tissues_conds"][2];
+    skull_flt = atof(skull_str.c_str());
+    skull_flt += (skull_flt + (0.03/numTasks)*i);
+    skull_str = boost::lexical_cast<string>( skull_flt );
+    inputs[i].params["tissues_conds"][2] = skull_str;
+    cout << inputs[i].params["tissues_conds"][2] << endl;
+  }
 
   /* PRESTO: */
-  const unsigned numTasks = 2;
   Master<HmTask, HmTask, numTasks> M;
   M.Launch();
 

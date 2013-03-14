@@ -96,6 +96,7 @@ endif
 
 ifeq ($(HOSTNAME), hn1)
 MODULES := source /usr/local/packages/modules/init/bash;
+#MODULES := $(MODULES) module purge; module load
 MODULES := $(MODULES) module purge; module load mpi-tor/openmpi-1.4.5_gcc-4.4.6
 #MODULES := $(MODULES) module purge; module load mpi-tor/openmpi-1.5.4_gcc-4.5.3
 endif

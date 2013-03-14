@@ -24,6 +24,10 @@ args = parser.parse_args()
 command = 'get_free_nodes ' + args.node_type
 out = subprocess.check_output(command, shell=True)
 out = out.split()
+try:
+  out.remove('bn33')
+except:
+  pass
 num_nodes_avail = len(out)
 if args.count:
   print num_nodes_avail
@@ -51,10 +55,15 @@ if not os.path.exists(presto_config_path):
 hostsfile = open(os.path.join(presto_config_path, 'presto_hosts'), 'w')
 
 notification = 'selecting nodes: '
+first = True
 for nodename in out[:args.n]:
   qsub_command += nodename + ':ppn='+str(args.ppn)+'+'
   notification += nodename + ', '
-  hostsfile.write(nodename + ' max_slots=1\n')
+  if first:
+    hostsfile.write(nodename + ' max_slots=2\n')
+    first = False
+  else:
+    hostsfile.write(nodename + ' max_slots=1\n')
 
 hostsfile.close()
 qsub_command = qsub_command[:-1]

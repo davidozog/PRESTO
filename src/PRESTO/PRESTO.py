@@ -12,6 +12,7 @@ import posix_ipc
 import sysv_ipc
 import mmap
 import shmemUtils
+from multiprocessing import Process, Pipe
 
 DEBUG = True
 
@@ -40,7 +41,8 @@ def launch_matlab(queue, worker_dict):
   # Without GUI:
   presto_mpath = os.path.join(PRESTO_DIR, 'presto_setpath.m')
 
-  p = subprocess.Popen(MATLAB_BIN + ' -nodesktop -nosplash -r \"run ' + presto_mpath + ';' + worker_dict + '\"', stdout=open('worker0.log', 'w'), stderr=open('worker0.err', 'w'), shell=True)
+  p = subprocess.Popen(MATLAB_BIN + ' -nodesktop -nosplash -r \"run ' + presto_mpath + ';' + worker_dict + '\"', shell=True)
+  #p = subprocess.Popen(MATLAB_BIN + ' -nodesktop -nosplash -r \"run ' + presto_mpath + ';' + worker_dict + '\"', stdout=open('worker0.log', 'w'), stderr=open('worker0.err', 'w'), shell=True)
   # With GUI:
   #p = subprocess.Popen(MATLAB_BIN + ' -desktop -r \"'+ worker_dict + 
   #                     '\"', shell=True)
@@ -164,6 +166,27 @@ def waitOnResults(conn, mpiComm, protocol):
     #  if(DEBUG):print 'KILL MESSAGE came from ' + str(worker_status.source)
     #  kill = mpiComm.recv(source=worker_status.source, tag=worker_status.tag)
 
+def Rvis(conn):
+  print conn.recv()
+  #p = subprocess.Popen('R --no-save', stdin=subprocess.PIPE, shell=True)
+  #p = subprocess.Popen('matlab -nodesktop -nosplash', stdin=subprocess.PIPE, shell=True)
+  #p = subproCess.Popen('R --interactive', stdin=subprocess.PIPE, shell=True)
+  #p = subprocess.Popen('R --interactive', shell=True)
+  #p = subprocess.Popen('R --no-save < socket.R', stdout=subprocess.PIPE, shell=True)
+  p = subprocess.Popen('R --no-save --interactive < socket.R', shell=True)
+
+  #out, err = p.communicate('x=rnorm(1000,mean=0,sd=1); hist(x)')
+  #p.wait()
+  #out, err = p.communicate('x=norm(1000); hist(x);')
+  #out, err = p.communicate('y=norm(10)')
+  p.communicate()
+  #print out
+
+def analyzeResults(mesg):
+  p = subprocess.check_output("./analyzeResults " + mesg, shell=True)  
+  return p.strip()
+
+
 
 # Initialize mpi4py:
 mpiComm = MPI.COMM_WORLD
@@ -204,7 +227,7 @@ if (rank==0):
   elif interface == 'python':
     py_app = sys.argv[2]
     t = threading.Thread(target=launch_python, args=(q, worker_dict, "python " + py_app))
-  elif interface == 'cpp':
+  elif interface == 'cpp' or interface == 'cppvis':
     cpp_app = sys.argv[2]
     if cpp_app.find('presto_for_') >= 0:
       cpp_app = sys.argv[2] + ' ' + sys.argv[3]
@@ -251,7 +274,10 @@ if (rank==0):
           mesg = ''
           mesg_q = Queue()
           running_jobs = []   # rank of the workers with running jobs
-        destination = 0
+        if interface != 'cppvis':
+          destination = 0
+        else:
+          destination = 1
         while mesg!='kill':
           if(DEBUG):print '     master waiting for work...'
           mesg = ''
@@ -302,8 +328,11 @@ if (rank==0):
             if protocol != 'DAG':
               if (destination != size-1):
                 destination = (destination + 1) % size
-              else:
+              elif interface != 'cppvis':
                 destination = 1
+              else:
+                destination = 2
+
             else:
               destination = int(dag_destination)
             
@@ -358,6 +387,8 @@ if (rank==0):
                 results_file = open(TMPFS_PATH +'.'+ uid + '_r' + jobid + '.mat', 'wb')
                 results_file.write(data[data.find(':')+1:])
                 results_file.close()
+                if interface == 'cppvis':
+                  mpiComm.send(results_file.name, dest=1, tag=DO_WORK_TAG)
                 cnn.sendall(results_file.name + '\n')
                 #TODO: make sure mesg doesn't contain shared data, and 
                 #      transmits 'persist' or something like that
@@ -416,13 +447,14 @@ if (rank==0):
           data = mpiComm.recv(source=MPI.ANY_SOURCE, tag=RESULTS_TAG, status=master_status)
           #if(DEBUG):print 'GOT RESULT:' + data
           if(DEBUG):print 'GOT RESULT'
+
           if protocol != 'DAG':
             running_jobs.remove(master_status.source)
   
           master_status = MPI.Status()
 
           if protocol == 'NETWORK':
-            result_mesg = ':'.join(data.split(':')[:-1]) + '\n'
+            result_mesg = ':'.join(data.split(':')[:0]) + '\n'
             cnn.sendall(result_mesg)
 
             mesg_data = data.split(':')[-1]
@@ -456,6 +488,8 @@ if (rank==0):
             results_file = open(TMPFS_PATH + '.' + uid + '_r' + jobid + '.mat', 'wb')
             results_file.write(data[data.find(':')+1:])
             results_file.close()
+            if interface == 'cppvis':
+              mpiComm.send(results_file.name, dest=1, tag=DO_WORK_TAG)
             cnn.sendall(results_file.name + '\n')
       
           else:
@@ -485,7 +519,7 @@ if (rank==0):
         break
 
 # WORKER CONTROL:
-else: 
+elif interface != 'cppvis' or rank != 1: 
   data = {'name': name, 'rank': rank}
   mpiComm.send(data, dest=0, tag=CHECKIN_TAG)
   #args = [MATLAB_BIN, '-nodesktop', '-nosplash', '-r', 'mworker(\''+name+'\', '+srank+')']  
@@ -498,7 +532,7 @@ else:
     cmd = "java Worker " + name + " " + srank
   elif interface == 'python':
     cmd = 'python ' + os.path.join(PRESTO_DIR, 'src/python/py_worker.py') + ' ' +  name + ' ' + srank + ' ' + str(size)
-  elif interface == 'cpp':
+  elif interface == 'cpp' or 'cppvis':
     cmd = os.path.join(PRESTO_DIR, 'src/cpp/cppWorker') + ' ' +  name + ' ' + srank + ' ' + str(size)
   if(DEBUG):print "cmd is: " + cmd
   p = subprocess.Popen(cmd, stdout=open('worker'+srank+'.log', 'w'), stderr=open('worker'+srank+'.err', 'w'), shell=True)
@@ -595,6 +629,43 @@ else:
       conn.sendall("kill")
       conn.close()
       break
+
+else:
+  data = {'name': name, 'rank': rank}
+  mpiComm.send(data, dest=0, tag=CHECKIN_TAG)
+  worker_status = MPI.Status()
+
+  sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+  sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+  sock.bind(('localhost', WORKER_PORT))
+  sock.listen(1)
+
+  parent_conn, child_conn = Pipe()
+  p = Process(target=Rvis, args=(child_conn,))
+  p.start()
+  parent_conn.send([42, None, 'hello,vis'])
+
+  cnn, addr = sock.accept()
+  mesg=''
+  mesg = cnn.recv(128)
+  print 'got mesg:' + mesg
+  while mesg != 'kill':
+    mesg = mpiComm.recv(source=0, tag=MPI.ANY_TAG, status=worker_status)
+    if (worker_status.tag == DO_WORK_TAG):
+      print 'VIS got: ' + mesg + '\n'
+
+      data = analyzeResults(mesg)
+
+      cnn.sendall(data)
+      mesg = cnn.recv(128)
+      print 'got new mesg:' + mesg
+    elif (worker_status.tag == KILL_TAG):
+      print "VISKILL"
+      kill = 1
+      cnn.sendall("kill")
+      cnn.close()
+      break
+
 
 # MPI : once rank 0 Matlab is dead, kill the workers
 if(DEBUG):print 'kill is first ' + str(kill) + ' on rank ' + srank

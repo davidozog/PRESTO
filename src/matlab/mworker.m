@@ -47,7 +47,7 @@ function mworker(my_hostname, rank)
   matlabpool close force local
   while pct
     try
-      matlabpool open local
+      matlabpool open local 12
       pct = false
     catch
       pause(1);

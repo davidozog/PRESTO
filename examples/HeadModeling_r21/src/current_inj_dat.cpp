@@ -20,6 +20,16 @@ CurrentInjecData::CurrentInjecData(const string& rEitData){
   LoadEitData(rEitData);
 }
 
+vector<float> CurrentInjecData::getEitData(){
+  vector<float> eit_data = mEitData;
+  return eit_data;
+}
+
+vector<int> CurrentInjecData::getExcludeElectrodes(){
+  vector<int> exclude_electrodes = mExecludeElectrodes;
+  return exclude_electrodes;
+}
+
 int CurrentInjecData::LoadEitData(const string & rEitData){
 
   ifstream inm(&rEitData[0]);

@@ -985,22 +985,22 @@ int HeadModel::LoadSensorsBk(const string& sensors_fname){
     if (sns_id == "FidNz" || sns_id == "FidT9" || sns_id == "FidT10" 
 	|| sns_id == "Cz"){
       /* This breaks the Bone Mineral Density code with PL data - not sure why yet */
-      mRefSensorsMap[sns_id].push_back((int) x/dx);
-      mRefSensorsMap[sns_id].push_back((int) y/dy);
-      mRefSensorsMap[sns_id].push_back((int) z/dz);
-      //mRefSensorsMap[sns_id].push_back((int) x);
-      //mRefSensorsMap[sns_id].push_back((int) y);
-      //mRefSensorsMap[sns_id].push_back((int) z);
+      //mRefSensorsMap[sns_id].push_back((int) x/dx);
+      //mRefSensorsMap[sns_id].push_back((int) y/dy);
+      //mRefSensorsMap[sns_id].push_back((int) z/dz);
+      mRefSensorsMap[sns_id].push_back((int) x);
+      mRefSensorsMap[sns_id].push_back((int) y);
+      mRefSensorsMap[sns_id].push_back((int) z);
     }
     else if (sns_id[0] == 'E'){
       sns_ids_int = atoi(&sns_id[1]);
       /* This breaks the Bone Mineral Density code with PL data - not sure why yet */
-      mSensorsMap[sns_ids_int].push_back((int) x/dx);
-      mSensorsMap[sns_ids_int].push_back((int) y/dy);
-      mSensorsMap[sns_ids_int].push_back((int) z/dz);
-      //mSensorsMap[sns_ids_int].push_back((int) x);
-      //mSensorsMap[sns_ids_int].push_back((int) y);
-      //mSensorsMap[sns_ids_int].push_back((int) z);
+      //mSensorsMap[sns_ids_int].push_back((int) x/dx);
+      //mSensorsMap[sns_ids_int].push_back((int) y/dy);
+      //mSensorsMap[sns_ids_int].push_back((int) z/dz);
+      mSensorsMap[sns_ids_int].push_back((int) x);
+      mSensorsMap[sns_ids_int].push_back((int) y);
+      mSensorsMap[sns_ids_int].push_back((int) z);
     }
     else {
       cerr << "DataError: unrecognized sensor id " << sns_id << endl;
