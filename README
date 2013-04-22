@@ -1,10 +1,10 @@
 PRESTO: Parallel Runtime Environment for Scalable Task-Oriented Compuations
 ===========================================================================
-Presto is a distributed framework that supports various parallel
-computational models (e.g. master/worker, pipeline, graph-based,
-MapReduce, etc.) with various programming adaptors (Matlab, 
-Java, C++, etc.)  Currently, this repository includes code that
-supports the master/worker model with Matlab or Java adaptors.
+Presto is a distributed framework whose goal is to support various parallel
+computational models (e.g. master/worker, pipeline, graph-based, MapReduce, 
+etc.) with various programming adaptors (Matlab, Java, C++, etc.) 
+Currently, this repository includes code that supports the master/worker 
+model with Matlab, Java, Python, or C++ adaptors.
 
 
 INSTALLATION
